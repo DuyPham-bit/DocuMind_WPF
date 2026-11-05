@@ -1,0 +1,6 @@
+.qa/
+tools/DbCheck/bin/
+tools/DbCheck/obj/
+tools/__pycache__/
+.~lock.*#
+~$*
