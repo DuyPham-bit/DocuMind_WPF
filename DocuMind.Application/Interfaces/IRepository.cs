@@ -13,7 +13,6 @@ public interface IRepository<T> where T : class
     Task UpdateAsync(T entity);
     Task DeleteAsync(T entity);
     Task DeleteRangeAsync(IEnumerable<T> entities);
-    Task<int> SaveChangesAsync();
 }
 
 public interface IDocumentChunkRepository : IRepository<DocumentChunk>
@@ -22,4 +21,3 @@ public interface IDocumentChunkRepository : IRepository<DocumentChunk>
     Task<List<string>> GetDistinctFilesByWorkspaceAsync(Guid workspaceId);
     Task DeleteByFileNameAsync(Guid workspaceId, string fileName);
 }
-

@@ -1,59 +1,43 @@
 using System.Runtime.Versioning;
 using System.Security.Cryptography;
 using System.Text;
+using DocuMind.Application.Interfaces;
 
 namespace DocuMind.Infrastructure.Security;
 
 [SupportedOSPlatform("windows")]
+public sealed class WindowsDpapiSecretProtector : ISecretProtector
+{
+    public string Protect(string plainText) => WindowsDpapiSecretManager.Encrypt(plainText);
+    public string Unprotect(string cipherText) => WindowsDpapiSecretManager.Decrypt(cipherText);
+}
+
+[SupportedOSPlatform("windows")]
 public static class WindowsDpapiSecretManager
 {
-    /// <summary>
-    /// Encrypts plain text using Windows DPAPI (CurrentUser scope) and encodes as Base64.
-    /// </summary>
     public static string Encrypt(string plainText)
     {
-        if (string.IsNullOrEmpty(plainText))
-            return string.Empty;
-
+        if (string.IsNullOrEmpty(plainText)) return "";
         try
         {
-            var plainBytes = Encoding.UTF8.GetBytes(plainText);
-            var encryptedBytes = ProtectedData.Protect(plainBytes, null, DataProtectionScope.CurrentUser);
-            return Convert.ToBase64String(encryptedBytes);
+            return Convert.ToBase64String(ProtectedData.Protect(Encoding.UTF8.GetBytes(plainText), null, DataProtectionScope.CurrentUser));
         }
-        catch
+        catch (Exception ex) when (ex is CryptographicException or PlatformNotSupportedException)
         {
-            // Fallback nếu không hỗ trợ DPAPI
-            return Convert.ToBase64String(Encoding.UTF8.GetBytes(plainText));
+            throw new InvalidOperationException("Windows DPAPI không thể mã hóa key. Cấu hình chưa được lưu.");
         }
     }
 
-    /// <summary>
-    /// Decrypts Base64 encrypted text using Windows DPAPI (CurrentUser scope).
-    /// </summary>
     public static string Decrypt(string cipherText)
     {
-        if (string.IsNullOrEmpty(cipherText))
-            return string.Empty;
-
+        if (string.IsNullOrEmpty(cipherText)) return "";
         try
         {
-            var encryptedBytes = Convert.FromBase64String(cipherText);
-            var decryptedBytes = ProtectedData.Unprotect(encryptedBytes, null, DataProtectionScope.CurrentUser);
-            return Encoding.UTF8.GetString(decryptedBytes);
+            return Encoding.UTF8.GetString(ProtectedData.Unprotect(Convert.FromBase64String(cipherText), null, DataProtectionScope.CurrentUser));
         }
-        catch
+        catch (Exception ex) when (ex is CryptographicException or FormatException or PlatformNotSupportedException)
         {
-            try
-            {
-                // Fallback nếu chuỗi không phải DPAPI cipher
-                return Encoding.UTF8.GetString(Convert.FromBase64String(cipherText));
-            }
-            catch
-            {
-                return cipherText;
-            }
+            throw new InvalidOperationException("Không thể giải mã key bằng DPAPI CurrentUser. Hãy nhập lại key và Lưu.");
         }
     }
 }
-

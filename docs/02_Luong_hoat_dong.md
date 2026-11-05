@@ -1,3 +1,5 @@
+> Tài liệu lịch sử của bản gốc 355df3d. Luồng/schema và trạng thái sửa lỗi hiện hành: [05_Fixes_va_Nghiem_thu.md](05_Fixes_va_Nghiem_thu.md). Các mô tả lỗi dưới đây là bằng chứng trước khi sửa.
+
 # Luồng hoạt động của project DocuMind
 
 Tài liệu giải thích cách giao diện WPF, application service, database và API phối hợp trong ứng dụng trợ lý học tập DocuMind. Mỗi luồng cho biết điểm vào, dữ liệu đi qua hệ thống, kết quả và tình huống thất bại để thành viên nhóm có thể theo dõi một thao tác từ UI đến nơi xử lý.

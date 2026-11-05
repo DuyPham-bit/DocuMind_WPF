@@ -1,16 +1,10 @@
--- DOCUMIND SQLITE | baseline 355df3d | 2026-11-05
--- SQL thuan, file UTF-8. Chi chay bang SQLite, KHONG chay trong SQL Server.
--- DB Browser for SQLite: Open Database -> Execute SQL -> dan script -> Execute.
--- Chon dung file: app luu documind_local.db canh exe (thu muc bin khi debug).
--- Schema doi chieu AppDbContext.Database.GenerateCreateScript().
--- CREATE IF NOT EXISTS chi bo qua doi tuong da co, KHONG nang cap schema cu.
--- Sao luu DB va dong app truoc khi thay doi du lieu. Khong co DROP/DELETE du lieu that.
--- PRAGMA foreign_keys phai bat tren MOI connection, ben ngoai transaction.
-PRAGMA foreign_keys = ON;
+CREATE TABLE IF NOT EXISTS "__EFMigrationsHistory" (
+    "MigrationId" TEXT NOT NULL CONSTRAINT "PK___EFMigrationsHistory" PRIMARY KEY,
+    "ProductVersion" TEXT NOT NULL
+);
 
--- 1. CAU TRUC VA INDEX
 BEGIN TRANSACTION;
-CREATE TABLE IF NOT EXISTS "ProviderSettings" (
+CREATE TABLE "ProviderSettings" (
     "Id" INTEGER NOT NULL CONSTRAINT "PK_ProviderSettings" PRIMARY KEY AUTOINCREMENT,
     "ProviderType" INTEGER NOT NULL,
     "EncryptedApiKey" TEXT NOT NULL,
@@ -20,24 +14,26 @@ CREATE TABLE IF NOT EXISTS "ProviderSettings" (
     "Temperature" REAL NOT NULL,
     "IsActive" INTEGER NOT NULL
 );
-CREATE TABLE IF NOT EXISTS "Workspaces" (
+
+CREATE TABLE "Workspaces" (
     "Id" TEXT NOT NULL CONSTRAINT "PK_Workspaces" PRIMARY KEY,
     "Name" TEXT NOT NULL,
     "Description" TEXT NOT NULL,
     "SystemPrompt" TEXT NOT NULL,
     "CreatedAt" TEXT NOT NULL
 );
-CREATE TABLE IF NOT EXISTS "ChatMessages" (
+
+CREATE TABLE "ChatMessages" (
     "Id" TEXT NOT NULL CONSTRAINT "PK_ChatMessages" PRIMARY KEY,
     "WorkspaceId" TEXT NOT NULL,
     "Role" INTEGER NOT NULL,
     "Content" TEXT NOT NULL,
     "SourcesJson" TEXT NULL,
     "Timestamp" TEXT NOT NULL,
-    CONSTRAINT "FK_ChatMessages_Workspaces_WorkspaceId"
-      FOREIGN KEY ("WorkspaceId") REFERENCES "Workspaces" ("Id") ON DELETE CASCADE
+    CONSTRAINT "FK_ChatMessages_Workspaces_WorkspaceId" FOREIGN KEY ("WorkspaceId") REFERENCES "Workspaces" ("Id") ON DELETE CASCADE
 );
-CREATE TABLE IF NOT EXISTS "DocumentChunks" (
+
+CREATE TABLE "DocumentChunks" (
     "Id" TEXT NOT NULL CONSTRAINT "PK_DocumentChunks" PRIMARY KEY,
     "WorkspaceId" TEXT NOT NULL,
     "FileName" TEXT NOT NULL,
@@ -45,68 +41,152 @@ CREATE TABLE IF NOT EXISTS "DocumentChunks" (
     "Content" TEXT NOT NULL,
     "EmbeddingJson" TEXT NOT NULL,
     "CreatedAt" TEXT NOT NULL,
-    CONSTRAINT "FK_DocumentChunks_Workspaces_WorkspaceId"
-      FOREIGN KEY ("WorkspaceId") REFERENCES "Workspaces" ("Id") ON DELETE CASCADE
+    CONSTRAINT "FK_DocumentChunks_Workspaces_WorkspaceId" FOREIGN KEY ("WorkspaceId") REFERENCES "Workspaces" ("Id") ON DELETE CASCADE
 );
-CREATE INDEX IF NOT EXISTS "IX_ChatMessages_WorkspaceId" ON "ChatMessages" ("WorkspaceId");
-CREATE INDEX IF NOT EXISTS "IX_DocumentChunks_WorkspaceId" ON "DocumentChunks" ("WorkspaceId");
-CREATE INDEX IF NOT EXISTS "IX_DocumentChunks_WorkspaceId_FileName" ON "DocumentChunks" ("WorkspaceId", "FileName");
-CREATE UNIQUE INDEX IF NOT EXISTS "IX_ProviderSettings_ProviderType" ON "ProviderSettings" ("ProviderType");
 
--- 2. SEED BAT BUOC. Khong ghi de workspace da duoc sua.
-INSERT INTO "Workspaces" ("Id", "Name", "Description", "SystemPrompt", "CreatedAt")
-SELECT '11111111-1111-1111-1111-111111111111',
-       'Workspace Mặc Định',
-       'Không gian làm việc và tra cứu tài liệu thông minh cá nhân.',
-       'Bạn là trợ lý học tập và nghiên cứu tài liệu chuẩn xác. Hãy trả lời súc tích, mạch lạc và bám sát tài liệu.',
-       '2026-01-01 00:00:00'
-WHERE NOT EXISTS (SELECT 1 FROM "Workspaces" WHERE "Id" = '11111111-1111-1111-1111-111111111111');
+INSERT INTO "Workspaces" ("Id", "CreatedAt", "Description", "Name", "SystemPrompt")
+VALUES ('11111111-1111-1111-1111-111111111111', '2026-01-01 00:00:00', 'Không gian làm việc và tra cứu tài liệu thông minh cá nhân.', 'Workspace Mặc Định', 'Bạn là trợ lý học tập và nghiên cứu tài liệu chuẩn xác. Hãy trả lời súc tích, mạch lạc và bám sát tài liệu.');
+SELECT changes();
+
+
+CREATE INDEX "IX_ChatMessages_WorkspaceId" ON "ChatMessages" ("WorkspaceId");
+
+CREATE INDEX "IX_DocumentChunks_WorkspaceId" ON "DocumentChunks" ("WorkspaceId");
+
+CREATE INDEX "IX_DocumentChunks_WorkspaceId_FileName" ON "DocumentChunks" ("WorkspaceId", "FileName");
+
+CREATE UNIQUE INDEX "IX_ProviderSettings_ProviderType" ON "ProviderSettings" ("ProviderType");
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261105154622_LegacyBaseline', '10.0.14');
+
 COMMIT;
 
--- Enum ProviderType: 1 Gemini, 2 OpenAI, 3 Groq, 4 OllamaLocal.
--- Enum Role: 1 System, 2 User, 3 Assistant. ChatMode: 1 Direct, 2 Rag (chua luu vao bang).
--- Guid va thoi gian do code C# tao; schema khong co DEFAULT NEWID/CURRENT_TIMESTAMP.
--- MaxLength cua EF khong thanh gioi han do dai TEXT tren SQLite.
-
--- 3. QUERY DOC DU LIEU
-SELECT "Id", "Name", "Description", "CreatedAt" FROM "Workspaces" ORDER BY "CreatedAt";
-SELECT "WorkspaceId", "FileName", COUNT(*) AS "ChunkCount",
-       MIN("PageNumber") AS "FirstPage", MAX("PageNumber") AS "LastPage"
-FROM "DocumentChunks" GROUP BY "WorkspaceId", "FileName" ORDER BY "FileName";
-SELECT w."Name", COUNT(c."Id") AS "ChunkCount", COUNT(DISTINCT c."FileName") AS "FileCount"
-FROM "Workspaces" w LEFT JOIN "DocumentChunks" c ON c."WorkspaceId" = w."Id"
-GROUP BY w."Id", w."Name";
-SELECT "FileName", "PageNumber", "Content", length("EmbeddingJson") AS "VectorJsonChars"
-FROM "DocumentChunks" WHERE "WorkspaceId" = '11111111-1111-1111-1111-111111111111'
-ORDER BY "FileName", "PageNumber" LIMIT 20;
--- Chi hien metadata; KHONG SELECT EncryptedApiKey de chia se ra ngoai.
-SELECT "ProviderType", "ChatModel", "EmbeddingModel", "BaseUrl", "Temperature", "IsActive"
-FROM "ProviderSettings" WHERE "IsActive" = 1;
-SELECT COUNT(*) AS "ActiveProviderCount" FROM "ProviderSettings" WHERE "IsActive" = 1;
--- ChatMessages rong la dung voi UI hien tai: app chua luu chat xuong DB.
-SELECT "WorkspaceId", "Role", "Content", "Timestamp" FROM "ChatMessages" ORDER BY "Timestamp" LIMIT 20;
-SELECT c."Id" AS "OrphanChunk" FROM "DocumentChunks" c
-LEFT JOIN "Workspaces" w ON w."Id" = c."WorkspaceId" WHERE w."Id" IS NULL;
-PRAGMA foreign_key_check;
-PRAGMA table_info('DocumentChunks');
-PRAGMA index_list('DocumentChunks');
-
--- 4. OPTIONAL CRUD BEGIN
--- Vi du chi dung workspace rieng, vector GIA de minh hoa schema, KHONG dung RAG.
--- Ca khoi tu rollback; chay tron khoi. Doi ROLLBACK thanh COMMIT chi khi chu dong muon luu.
 BEGIN TRANSACTION;
-INSERT INTO "Workspaces" VALUES
-('dddddddd-dddd-dddd-dddd-dddddddddddd', 'Không gian thực hành', 'Dữ liệu mẫu', 'Trợ lý ôn tập', '2026-11-05 00:00:00');
-INSERT INTO "DocumentChunks" VALUES
-('cccccccc-cccc-cccc-cccc-cccccccccccc', 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'ôn tập.txt', 1,
- 'MVVM tách giao diện và trạng thái trình bày.', '[0.1,0.2]', '2026-11-05 00:00:00');
-INSERT INTO "ChatMessages" VALUES
-('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'dddddddd-dddd-dddd-dddd-dddddddddddd', 2, 'MVVM là gì?', NULL, '2026-11-05 00:00:00');
-UPDATE "Workspaces" SET "Description" = 'Đã cập nhật mô tả' WHERE "Id" = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
-SELECT * FROM "Workspaces" WHERE "Id" = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
-DELETE FROM "Workspaces" WHERE "Id" = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
-SELECT COUNT(*) AS "RemainingSampleChunks" FROM "DocumentChunks" WHERE "WorkspaceId" = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
-ROLLBACK;
--- OPTIONAL CRUD END
--- API key: nhap qua Settings. DPAPI CurrentUser gan voi tai khoan Windows/bo key may;
--- copy ciphertext sang may/tai khoan khac khong dam bao giai ma duoc. Khong chen key Base64.
+ALTER TABLE "Workspaces" ADD "ConversationId" TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000';
+
+ALTER TABLE "ProviderSettings" ADD "IsEmbeddingActive" INTEGER NOT NULL DEFAULT 0;
+
+ALTER TABLE "DocumentChunks" ADD "ChunkIndex" INTEGER NOT NULL DEFAULT 0;
+
+ALTER TABLE "DocumentChunks" ADD "DocumentVersionId" TEXT NULL;
+
+ALTER TABLE "ChatMessages" ADD "ConversationId" TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000';
+
+ALTER TABLE "ChatMessages" ADD "Mode" INTEGER NOT NULL DEFAULT 0;
+
+ALTER TABLE "ChatMessages" ADD "Model" TEXT NOT NULL DEFAULT '';
+
+ALTER TABLE "ChatMessages" ADD "Provider" TEXT NOT NULL DEFAULT '';
+
+ALTER TABLE "ChatMessages" ADD "Temperature" REAL NOT NULL DEFAULT 0.0;
+
+CREATE TABLE "Documents" (
+    "Id" TEXT NOT NULL CONSTRAINT "PK_Documents" PRIMARY KEY,
+    "WorkspaceId" TEXT NOT NULL,
+    "DisplayName" TEXT NOT NULL,
+    "SourcePath" TEXT COLLATE NOCASE NOT NULL,
+    "SourceHash" TEXT NOT NULL,
+    CONSTRAINT "FK_Documents_Workspaces_WorkspaceId" FOREIGN KEY ("WorkspaceId") REFERENCES "Workspaces" ("Id") ON DELETE CASCADE
+);
+
+CREATE TABLE "EmbeddingProfiles" (
+    "Id" TEXT NOT NULL CONSTRAINT "PK_EmbeddingProfiles" PRIMARY KEY,
+    "Provider" INTEGER NOT NULL,
+    "Model" TEXT NOT NULL,
+    "Endpoint" TEXT NOT NULL,
+    "Dimension" INTEGER NOT NULL,
+    "Normalization" TEXT NOT NULL,
+    "PipelineVersion" TEXT NOT NULL
+);
+
+CREATE TABLE "DocumentVersions" (
+    "Id" TEXT NOT NULL CONSTRAINT "PK_DocumentVersions" PRIMARY KEY,
+    "DocumentId" TEXT NOT NULL,
+    "Status" INTEGER NOT NULL,
+    "EmbeddingProfileId" TEXT NULL,
+    "IndexedAt" TEXT NOT NULL,
+    CONSTRAINT "FK_DocumentVersions_Documents_DocumentId" FOREIGN KEY ("DocumentId") REFERENCES "Documents" ("Id") ON DELETE CASCADE,
+    CONSTRAINT "FK_DocumentVersions_EmbeddingProfiles_EmbeddingProfileId" FOREIGN KEY ("EmbeddingProfileId") REFERENCES "EmbeddingProfiles" ("Id") ON DELETE RESTRICT
+);
+
+UPDATE "Workspaces" SET "ConversationId" = '22222222-2222-2222-2222-222222222222'
+WHERE "Id" = '11111111-1111-1111-1111-111111111111';
+SELECT changes();
+
+
+CREATE UNIQUE INDEX "IX_ProviderSettings_IsActive" ON "ProviderSettings" ("IsActive") WHERE "IsActive" = 1;
+
+CREATE UNIQUE INDEX "IX_ProviderSettings_IsEmbeddingActive" ON "ProviderSettings" ("IsEmbeddingActive") WHERE "IsEmbeddingActive" = 1;
+
+CREATE UNIQUE INDEX "IX_DocumentChunks_DocumentVersionId_ChunkIndex" ON "DocumentChunks" ("DocumentVersionId", "ChunkIndex");
+
+CREATE INDEX "IX_ChatMessages_WorkspaceId_ConversationId_Timestamp" ON "ChatMessages" ("WorkspaceId", "ConversationId", "Timestamp");
+
+CREATE UNIQUE INDEX "IX_Documents_WorkspaceId_SourcePath" ON "Documents" ("WorkspaceId", "SourcePath");
+
+CREATE UNIQUE INDEX "IX_DocumentVersions_DocumentId" ON "DocumentVersions" ("DocumentId") WHERE "Status" = 1;
+
+CREATE INDEX "IX_DocumentVersions_EmbeddingProfileId" ON "DocumentVersions" ("EmbeddingProfileId");
+
+CREATE UNIQUE INDEX "IX_EmbeddingProfiles_Provider_Model_Endpoint_Dimension_Normalization_PipelineVersion" ON "EmbeddingProfiles" ("Provider", "Model", "Endpoint", "Dimension", "Normalization", "PipelineVersion");
+
+CREATE TABLE "ef_temp_DocumentChunks" (
+    "Id" TEXT NOT NULL CONSTRAINT "PK_DocumentChunks" PRIMARY KEY,
+    "ChunkIndex" INTEGER NOT NULL,
+    "Content" TEXT NOT NULL,
+    "CreatedAt" TEXT NOT NULL,
+    "DocumentVersionId" TEXT NULL,
+    "EmbeddingJson" TEXT NOT NULL,
+    "FileName" TEXT NOT NULL,
+    "PageNumber" INTEGER NOT NULL,
+    "WorkspaceId" TEXT NOT NULL,
+    CONSTRAINT "FK_DocumentChunks_DocumentVersions_DocumentVersionId" FOREIGN KEY ("DocumentVersionId") REFERENCES "DocumentVersions" ("Id") ON DELETE CASCADE,
+    CONSTRAINT "FK_DocumentChunks_Workspaces_WorkspaceId" FOREIGN KEY ("WorkspaceId") REFERENCES "Workspaces" ("Id") ON DELETE CASCADE
+);
+
+INSERT INTO "ef_temp_DocumentChunks" ("Id", "ChunkIndex", "Content", "CreatedAt", "DocumentVersionId", "EmbeddingJson", "FileName", "PageNumber", "WorkspaceId")
+SELECT "Id", "ChunkIndex", "Content", "CreatedAt", "DocumentVersionId", "EmbeddingJson", "FileName", "PageNumber", "WorkspaceId"
+FROM "DocumentChunks";
+
+COMMIT;
+
+PRAGMA foreign_keys = 0;
+
+BEGIN TRANSACTION;
+DROP TABLE "DocumentChunks";
+
+ALTER TABLE "ef_temp_DocumentChunks" RENAME TO "DocumentChunks";
+
+COMMIT;
+
+PRAGMA foreign_keys = 1;
+
+BEGIN TRANSACTION;
+CREATE UNIQUE INDEX "IX_DocumentChunks_DocumentVersionId_ChunkIndex" ON "DocumentChunks" ("DocumentVersionId", "ChunkIndex");
+
+CREATE INDEX "IX_DocumentChunks_WorkspaceId" ON "DocumentChunks" ("WorkspaceId");
+
+CREATE INDEX "IX_DocumentChunks_WorkspaceId_FileName" ON "DocumentChunks" ("WorkspaceId", "FileName");
+
+COMMIT;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261105155417_VersionedRagAndHistory', '10.0.14');
+
+BEGIN TRANSACTION;
+INSERT INTO Documents (Id, WorkspaceId, DisplayName, SourcePath, SourceHash)
+SELECT MIN(Id), WorkspaceId, FileName, 'legacy:' || FileName, '' FROM DocumentChunks GROUP BY WorkspaceId, FileName;
+INSERT INTO DocumentVersions (Id, DocumentId, Status, EmbeddingProfileId, IndexedAt)
+SELECT d.Id, d.Id, 2, NULL, MIN(c.CreatedAt) FROM Documents d
+JOIN DocumentChunks c ON c.WorkspaceId = d.WorkspaceId AND c.FileName = d.DisplayName GROUP BY d.Id;
+UPDATE DocumentChunks SET
+    ChunkIndex = (SELECT COUNT(*) FROM DocumentChunks other WHERE other.WorkspaceId = DocumentChunks.WorkspaceId AND other.FileName = DocumentChunks.FileName AND other.Id < DocumentChunks.Id),
+    DocumentVersionId = (SELECT d.Id FROM Documents d WHERE d.WorkspaceId = DocumentChunks.WorkspaceId AND d.DisplayName = DocumentChunks.FileName);
+UPDATE Workspaces SET ConversationId = Id WHERE ConversationId = '00000000-0000-0000-0000-000000000000';
+UPDATE ChatMessages SET ConversationId = (SELECT w.ConversationId FROM Workspaces w WHERE w.Id = ChatMessages.WorkspaceId);
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261105160847_PreserveLegacyIndexData', '10.0.14');
+
+COMMIT;

@@ -1,3 +1,5 @@
+> Tài liệu lịch sử của bản gốc 355df3d. Luồng/schema và trạng thái sửa lỗi hiện hành: [05_Fixes_va_Nghiem_thu.md](05_Fixes_va_Nghiem_thu.md). Các mô tả lỗi dưới đây là bằng chứng trước khi sửa.
+
 # Hướng dẫn setup và giải thích code DocuMind
 
 Tài liệu dành cho thành viên nhóm phát triển ứng dụng WPF trợ lý học tập và nghiên cứu tài liệu. Sau khi đọc, người mới có thể chạy project, cấu hình AI, theo dõi đường đi của dữ liệu và xác định nơi cần sửa khi mở rộng chức năng.

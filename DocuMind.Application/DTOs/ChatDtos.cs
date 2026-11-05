@@ -6,7 +6,9 @@ public record RagSourceDto(
     string FileName,
     int PageNumber,
     string Content,
-    float Score
+    float Score,
+    Guid? DocumentId = null,
+    string? SourcePath = null
 );
 
 public record ChatResultDto(
@@ -22,4 +24,3 @@ public record ProviderConfigDto(
     double Temperature = 0.7,
     bool IsActive = true
 );
-

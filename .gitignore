@@ -377,3 +377,5 @@ FodyWeavers.xsd
 # API Keys and secrets
 appsettings.Development.json
 secrets.json
+.tools/
+*.db.backup*

@@ -1,202 +1,128 @@
 using System.Collections.ObjectModel;
-using System.Runtime.Versioning;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using DocuMind.Application.DTOs;
 using DocuMind.Application.Interfaces;
+using DocuMind.Application.Services;
 using DocuMind.Domain.Enums;
 
 namespace DocuMind.WPF.ViewModels;
 
-[SupportedOSPlatform("windows")]
-public partial class SettingsViewModel : ObservableObject
+public partial class SettingsViewModel(IChatProviderFactory providerFactory) : ObservableObject, IDisposable
 {
-    private readonly IChatProviderFactory _providerFactory;
-
-    public ObservableCollection<AiProviderType> AvailableProviders { get; } = new()
-    {
-        AiProviderType.Gemini,
-        AiProviderType.OpenAI,
-        AiProviderType.Groq,
-        AiProviderType.OllamaLocal
-    };
-
-    [ObservableProperty]
-    private AiProviderType _selectedProvider = AiProviderType.Gemini;
-
-    [ObservableProperty]
-    private string _apiKey = string.Empty;
-
-    [ObservableProperty]
-    private string _baseUrl = string.Empty;
-
-    [ObservableProperty]
-    private string _chatModel = "gemini-2.5-flash";
-
-    [ObservableProperty]
-    private double _temperature = 0.7;
-
-    [ObservableProperty]
-    private bool _isBusy;
-
-    [ObservableProperty]
-    private string _statusMessage = string.Empty;
-
-    [ObservableProperty]
-    private bool _isSuccessStatus;
-
+    private int _generation;
+    private bool _initializing;
+    private CancellationTokenSource? _operation;
+    public ObservableCollection<AiProviderType> AvailableProviders { get; } = new(Enum.GetValues<AiProviderType>());
+    [ObservableProperty] private AiProviderType _selectedProvider = AiProviderType.Gemini;
+    [ObservableProperty] private string _apiKey = "";
+    [ObservableProperty] private string _chatModel = "gemini-2.5-flash";
+    [ObservableProperty] private string _embeddingModel = "text-embedding-004";
+    [ObservableProperty] private string _baseUrl = "";
+    [ObservableProperty] private double _temperature = 0.7;
+    [ObservableProperty] private bool _useForEmbedding;
+    [ObservableProperty] private bool _isLoading;
+    [ObservableProperty] private bool _isBusy;
+    [ObservableProperty] private string _statusMessage = "";
+    [ObservableProperty] private bool _isSuccessStatus;
     public Action? CloseAction { get; set; }
+    public bool IsEditable => !IsBusy && !IsLoading;
+    public ProviderConfigDraft CaptureDraft() => new(SelectedProvider, ApiKey, ChatModel, EmbeddingModel, BaseUrl, Temperature, UseForEmbedding);
 
-    public SettingsViewModel(IChatProviderFactory providerFactory)
+    partial void OnIsBusyChanged(bool value) => RefreshCommands();
+    partial void OnIsLoadingChanged(bool value) => RefreshCommands();
+    private void RefreshCommands()
     {
-        _providerFactory = providerFactory;
+        OnPropertyChanged(nameof(IsEditable));
+        TestConnectionCommand.NotifyCanExecuteChanged();
+        TestEmbeddingCommand.NotifyCanExecuteChanged();
+        SaveCommand.NotifyCanExecuteChanged();
     }
 
     public async Task InitializeAsync()
     {
-        IsBusy = true;
-        StatusMessage = "Đang tải cấu hình...";
-
+        var generation = _generation;
+        IsLoading = true;
         try
         {
-            var active = await _providerFactory.GetActiveSettingAsync();
-            if (active != null)
-            {
-                SelectedProvider = active.ProviderType;
-                ChatModel = active.ChatModel;
-                BaseUrl = active.BaseUrl;
-                Temperature = active.Temperature;
-                ApiKey = await _providerFactory.GetDecryptedApiKeyAsync(active.ProviderType);
-                StatusMessage = $"Đang hoạt động: {active.ProviderType} ({active.ChatModel})";
-                IsSuccessStatus = true;
-            }
-            else
-            {
-                OnSelectedProviderChanged(SelectedProvider);
-                StatusMessage = "Chưa có Provider nào được cấu hình.";
-                IsSuccessStatus = false;
-            }
+            var active = await providerFactory.GetActiveSettingAsync();
+            if (generation != _generation) return;
+            _initializing = true;
+            if (active != null) SelectedProvider = active.ProviderType;
+            _initializing = false;
+            await LoadDraftAsync(SelectedProvider);
         }
-        catch (Exception ex)
-        {
-            StatusMessage = $"Lỗi đọc cấu hình: {ex.Message}";
-            IsSuccessStatus = false;
-        }
-        finally
-        {
-            IsBusy = false;
-        }
+        catch (Exception ex) { StatusMessage = UserErrors.Describe(ex); IsLoading = false; }
+        finally { _initializing = false; }
     }
 
     partial void OnSelectedProviderChanged(AiProviderType value)
     {
-        // Gợi ý giá trị mặc định theo từng nền tảng
-        switch (value)
-        {
-            case AiProviderType.Gemini:
-                ChatModel = "gemini-2.5-flash";
-                BaseUrl = "";
-                break;
-            case AiProviderType.OpenAI:
-                ChatModel = "gpt-4o-mini";
-                BaseUrl = "https://api.openai.com/v1";
-                break;
-            case AiProviderType.Groq:
-                ChatModel = "llama-3.3-70b-versatile";
-                BaseUrl = "https://api.groq.com/openai/v1";
-                break;
-            case AiProviderType.OllamaLocal:
-                ChatModel = "llama3";
-                BaseUrl = "http://localhost:11434/v1";
-                break;
-        }
-
-        // Tải API Key đã lưu (nếu có)
-        _ = LoadSavedKeyForCurrentProviderAsync();
+        if (!_initializing) _ = LoadDraftAsync(value);
     }
 
-    private async Task LoadSavedKeyForCurrentProviderAsync()
+    public async Task LoadDraftAsync(AiProviderType provider)
     {
+        var generation = ++_generation;
+        _operation?.Cancel();
+        ApiKey = ""; ChatModel = ""; EmbeddingModel = ""; BaseUrl = ""; Temperature = 0.7; UseForEmbedding = false;
+        IsLoading = true; IsSuccessStatus = false; StatusMessage = "Đang tải cấu hình...";
         try
         {
-            var key = await _providerFactory.GetDecryptedApiKeyAsync(SelectedProvider);
-            if (!string.IsNullOrEmpty(key))
-            {
-                ApiKey = key;
-            }
-        }
-        catch { }
-    }
-
-    [RelayCommand]
-    private async Task TestConnectionAsync()
-    {
-        if (string.IsNullOrWhiteSpace(ApiKey) && SelectedProvider != AiProviderType.OllamaLocal)
-        {
-            StatusMessage = "Vui lòng nhập API Key trước khi kiểm tra.";
-            IsSuccessStatus = false;
-            return;
-        }
-
-        IsBusy = true;
-        StatusMessage = "Đang kiểm tra kết nối API...";
-
-        try
-        {
-            // Tạm thời chuyển provider để test
-            await _providerFactory.SwitchProviderAsync(SelectedProvider, ApiKey, ChatModel, BaseUrl, Temperature);
-            var provider = await _providerFactory.GetActiveProviderAsync();
-            bool ok = await provider.TestConnectionAsync();
-
-            if (ok)
-            {
-                StatusMessage = "Kết nối thành công! API Key và Model hợp lệ.";
-                IsSuccessStatus = true;
-            }
-            else
-            {
-                StatusMessage = "Không nhận được phản hồi từ AI. Vui lòng kiểm tra lại Key hoặc Model.";
-                IsSuccessStatus = false;
-            }
+            var draft = await providerFactory.LoadDraftAsync(provider);
+            if (generation != _generation || provider != SelectedProvider) return;
+            ApiKey = draft.ApiKey; ChatModel = draft.ChatModel; EmbeddingModel = draft.EmbeddingModel;
+            BaseUrl = draft.BaseUrl; Temperature = draft.Temperature; UseForEmbedding = draft.UseForEmbedding;
+            StatusMessage = draft.KeyNeedsReplacement ? "Không thể giải mã key cũ bằng DPAPI CurrentUser. Hãy nhập lại key và Lưu; các trường cấu hình khác đã được giữ lại."
+                : "Cấu hình nháp. Kiểm tra không lưu cấu hình; chỉ Lưu mới kích hoạt provider chat.";
         }
         catch (Exception ex)
         {
-            StatusMessage = $"Lỗi kết nối: {ex.Message}";
-            IsSuccessStatus = false;
+            if (generation == _generation) StatusMessage = UserErrors.Describe(ex) + " Nếu key cũ không giải mã được, hãy nhập lại key và Lưu.";
         }
-        finally
-        {
-            IsBusy = false;
-        }
+        finally { if (generation == _generation) IsLoading = false; }
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(IsEditable))]
+    private Task TestConnectionAsync() => RunTestAsync(false);
+    [RelayCommand(CanExecute = nameof(IsEditable))]
+    private Task TestEmbeddingAsync() => RunTestAsync(true);
+    private async Task RunTestAsync(bool embedding)
+    {
+        var draft = CaptureDraft();
+        var generation = _generation;
+        IsBusy = true; IsSuccessStatus = false; StatusMessage = "Đang kiểm tra cấu hình nháp...";
+        using var operation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        _operation = operation;
+        try
+        {
+            var ok = embedding
+                ? VectorMathHelper.IsValidVector(await providerFactory.CreateTemporaryEmbedding(draft).GenerateEmbeddingAsync("test", operation.Token))
+                : await providerFactory.CreateTemporary(draft).TestConnectionAsync(operation.Token);
+            if (generation != _generation) return;
+            IsSuccessStatus = ok;
+            StatusMessage = ok ? "Kết nối thành công. Cấu hình chưa được lưu." : "Không nhận được phản hồi hợp lệ. Cấu hình chưa được lưu.";
+        }
+        catch (Exception ex) { if (generation == _generation) StatusMessage = UserErrors.Describe(ex); }
+        finally { _operation = null; IsBusy = false; }
+    }
+
+    [RelayCommand] private void Cancel() => _operation?.Cancel();
+
+    [RelayCommand(CanExecute = nameof(IsEditable))]
     private async Task SaveAsync()
     {
-        if (string.IsNullOrWhiteSpace(ApiKey) && SelectedProvider != AiProviderType.OllamaLocal)
-        {
-            StatusMessage = "Vui lòng nhập API Key.";
-            IsSuccessStatus = false;
-            return;
-        }
-
-        IsBusy = true;
+        var draft = CaptureDraft();
+        IsBusy = true; IsSuccessStatus = false;
         try
         {
-            await _providerFactory.SwitchProviderAsync(SelectedProvider, ApiKey, ChatModel, BaseUrl, Temperature);
-            StatusMessage = "Đã lưu cấu hình thành công!";
-            IsSuccessStatus = true;
-            await Task.Delay(300);
+            await providerFactory.SaveAsync(draft);
+            IsSuccessStatus = true; StatusMessage = "Đã lưu cấu hình.";
             CloseAction?.Invoke();
         }
-        catch (Exception ex)
-        {
-            StatusMessage = $"Lỗi khi lưu: {ex.Message}";
-            IsSuccessStatus = false;
-        }
-        finally
-        {
-            IsBusy = false;
-        }
+        catch (Exception ex) { StatusMessage = UserErrors.Describe(ex); }
+        finally { IsBusy = false; }
     }
-}
 
+    public void Dispose() { ++_generation; _operation?.Cancel(); ApiKey = ""; }
+}

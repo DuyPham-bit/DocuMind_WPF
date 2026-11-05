@@ -5,102 +5,52 @@ using Microsoft.EntityFrameworkCore;
 
 namespace DocuMind.Infrastructure.Persistence;
 
-public class EfRepository<T> : IRepository<T> where T : class
+// Each method is a complete unit of work; callers never hold a DbContext across awaits/HTTP.
+public class EfRepository<T>(IDbContextFactory<AppDbContext> contexts) : IRepository<T> where T : class
 {
-    protected readonly AppDbContext _db;
-    protected readonly DbSet<T> _dbSet;
-
-    public EfRepository(AppDbContext db)
-    {
-        _db = db;
-        _dbSet = db.Set<T>();
-    }
-
     public async Task<T?> GetByIdAsync(Guid id)
     {
-        return await _dbSet.FindAsync(id);
+        await using var db = await contexts.CreateDbContextAsync();
+        return await db.Set<T>().FindAsync(id);
     }
-
     public async Task<List<T>> GetAllAsync()
     {
-        return await _dbSet.ToListAsync();
+        await using var db = await contexts.CreateDbContextAsync();
+        return await db.Set<T>().AsNoTracking().ToListAsync();
     }
-
     public async Task<List<T>> FindAsync(Expression<Func<T, bool>> predicate)
     {
-        return await _dbSet.Where(predicate).ToListAsync();
+        await using var db = await contexts.CreateDbContextAsync();
+        return await db.Set<T>().AsNoTracking().Where(predicate).ToListAsync();
     }
-
-    public async Task AddAsync(T entity)
-    {
-        await _dbSet.AddAsync(entity);
-    }
-
+    public Task AddAsync(T entity) => AddRangeAsync([entity]);
     public async Task AddRangeAsync(IEnumerable<T> entities)
     {
-        await _dbSet.AddRangeAsync(entities);
+        await using var db = await contexts.CreateDbContextAsync();
+        db.Set<T>().AddRange(entities);
+        await db.SaveChangesAsync();
     }
-
-    public Task UpdateAsync(T entity)
+    public async Task UpdateAsync(T entity)
     {
-        _dbSet.Update(entity);
-        return Task.CompletedTask;
+        await using var db = await contexts.CreateDbContextAsync();
+        db.Set<T>().Update(entity);
+        await db.SaveChangesAsync();
     }
-
-    public Task DeleteAsync(T entity)
+    public Task DeleteAsync(T entity) => DeleteRangeAsync([entity]);
+    public async Task DeleteRangeAsync(IEnumerable<T> entities)
     {
-        _dbSet.Remove(entity);
-        return Task.CompletedTask;
-    }
-
-    public Task DeleteRangeAsync(IEnumerable<T> entities)
-    {
-        _dbSet.RemoveRange(entities);
-        return Task.CompletedTask;
-    }
-
-    public async Task<int> SaveChangesAsync()
-    {
-        return await _db.SaveChangesAsync();
+        await using var db = await contexts.CreateDbContextAsync();
+        db.Set<T>().RemoveRange(entities);
+        await db.SaveChangesAsync();
     }
 }
 
-public class EfDocumentChunkRepository : EfRepository<DocumentChunk>, IDocumentChunkRepository
+public sealed class EfDocumentChunkRepository(IDbContextFactory<AppDbContext> contexts) : EfRepository<DocumentChunk>(contexts), IDocumentChunkRepository
 {
-    public EfDocumentChunkRepository(AppDbContext db) : base(db)
-    {
-    }
-
-    public async Task<List<DocumentChunk>> GetByWorkspaceAsync(Guid workspaceId)
-    {
-        return await _dbSet
-            .Where(c => c.WorkspaceId == workspaceId)
-            .OrderBy(c => c.FileName)
-            .ThenBy(c => c.PageNumber)
-            .ToListAsync();
-    }
-
-    public async Task<List<string>> GetDistinctFilesByWorkspaceAsync(Guid workspaceId)
-    {
-        return await _dbSet
-            .Where(c => c.WorkspaceId == workspaceId)
-            .Select(c => c.FileName)
-            .Distinct()
-            .OrderBy(f => f)
-            .ToListAsync();
-    }
-
-    public async Task DeleteByFileNameAsync(Guid workspaceId, string fileName)
-    {
-        var existing = await _dbSet
-            .Where(c => c.WorkspaceId == workspaceId && c.FileName == fileName)
-            .ToListAsync();
-
-        if (existing.Count > 0)
-        {
-            _dbSet.RemoveRange(existing);
-            await _db.SaveChangesAsync();
-        }
-    }
+    public async Task<List<DocumentChunk>> GetByWorkspaceAsync(Guid workspaceId) =>
+        (await FindAsync(c => c.WorkspaceId == workspaceId)).OrderBy(c => c.FileName).ThenBy(c => c.PageNumber).ToList();
+    public async Task<List<string>> GetDistinctFilesByWorkspaceAsync(Guid workspaceId) =>
+        (await GetByWorkspaceAsync(workspaceId)).Select(c => c.FileName).Distinct().Order().ToList();
+    public async Task DeleteByFileNameAsync(Guid workspaceId, string fileName) =>
+        await DeleteRangeAsync(await FindAsync(c => c.WorkspaceId == workspaceId && c.FileName == fileName));
 }
-

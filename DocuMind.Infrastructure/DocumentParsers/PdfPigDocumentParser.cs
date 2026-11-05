@@ -20,7 +20,7 @@ public class PdfPigDocumentParser : IDocumentParser
                 using var document = PdfDocument.Open(filePath);
                 foreach (var page in document.GetPages())
                 {
-                    if (ct.IsCancellationRequested) break;
+                    ct.ThrowIfCancellationRequested();
                     var text = page.Text?.Trim();
                     if (!string.IsNullOrWhiteSpace(text))
                     {
@@ -42,4 +42,3 @@ public class PdfPigDocumentParser : IDocumentParser
         return result;
     }
 }
-

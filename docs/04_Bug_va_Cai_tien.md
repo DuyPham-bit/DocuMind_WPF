@@ -1,3 +1,5 @@
+> Tài liệu lịch sử của bản gốc 355df3d. Luồng/schema và trạng thái sửa lỗi hiện hành: [05_Fixes_va_Nghiem_thu.md](05_Fixes_va_Nghiem_thu.md). Các mô tả lỗi dưới đây là bằng chứng trước khi sửa.
+
 # Bug và cải tiến giai đoạn đầu DocuMind
 
 Ngày rà soát: 05 tháng 11 năm 2026. Baseline: `355df3d`. Chủ đề sản phẩm: trợ lý học tập và nghiên cứu tài liệu. Đây là backlog đề xuất; các mục bên dưới chưa được sửa trong lần bổ sung tài liệu này.

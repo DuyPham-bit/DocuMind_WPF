@@ -12,5 +12,5 @@ public class ProviderSetting
     public string EmbeddingModel { get; set; } = string.Empty;
     public double Temperature { get; set; } = 0.7;
     public bool IsActive { get; set; }
+    public bool IsEmbeddingActive { get; set; }
 }
-

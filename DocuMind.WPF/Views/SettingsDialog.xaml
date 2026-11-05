@@ -4,10 +4,10 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="Cài Đặt Nền Tảng AI (AI Providers)" 
-        Height="540" Width="480"
+        Title="Cài Đặt Nền Tảng AI (AI Providers)"
+        Height="720" Width="560"
         WindowStartupLocation="CenterOwner"
-        ResizeMode="NoResize"
+        ResizeMode="CanResize" MinHeight="540" MinWidth="480"
         Background="#F8FAFC"
         FontFamily="Segoe UI, Tahoma, sans-serif">
 
@@ -78,9 +78,9 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="border" Background="{TemplateBinding Background}" 
-                                BorderBrush="{TemplateBinding BorderBrush}" 
-                                BorderThickness="{TemplateBinding BorderThickness}" 
+                        <Border x:Name="border" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="8">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
@@ -106,7 +106,7 @@
         <!-- Header -->
         <StackPanel Grid.Row="0" Margin="0,0,0,20">
             <TextBlock Text="Cấu Hình Nền Tảng AI" FontSize="18" FontWeight="Bold" Foreground="#0F172A"/>
-            <TextBlock Text="Đổi nhà cung cấp, thiết lập API Key được mã hóa chuẩn Windows DPAPI." 
+            <TextBlock Text="Đổi nhà cung cấp, thiết lập API Key được mã hóa chuẩn Windows DPAPI."
                        FontSize="12" Foreground="#64748B" Margin="0,4,0,0"/>
         </StackPanel>
 
@@ -116,7 +116,8 @@
                 <!-- Provider Selector -->
                 <StackPanel Margin="0,0,0,14">
                     <TextBlock Text="Nhà cung cấp AI (Provider)" FontWeight="SemiBold" Margin="0,0,0,6"/>
-                    <ComboBox ItemsSource="{Binding AvailableProviders}" 
+                    <ComboBox ItemsSource="{Binding AvailableProviders}"
+                              IsEnabled="{Binding IsEditable}"
                               SelectedItem="{Binding SelectedProvider}"
                               Height="38" FontSize="13" Padding="8,4"
                               Background="#FFFFFF" BorderBrush="#CBD5E1"/>
@@ -125,23 +126,32 @@
                 <!-- API Key -->
                 <StackPanel Margin="0,0,0,14">
                     <TextBlock Text="API Key (Mã khóa kết nối)" FontWeight="SemiBold" Margin="0,0,0,6"/>
-                    <TextBox Text="{Binding ApiKey, UpdateSourceTrigger=PropertyChanged}" 
-                             Style="{StaticResource RoundedTextBox}"/>
-                    <TextBlock Text="* Key được bảo mật tuyệt đối trên máy bằng Windows DPAPI." 
+                    <PasswordBox x:Name="KeyBox" PasswordChanged="KeyBox_PasswordChanged" Height="36" Padding="8" IsEnabled="{Binding IsEditable}"/>
+                    <Button Content="Giữ để hiện key" PreviewMouseLeftButtonDown="RevealKey_Down" PreviewMouseLeftButtonUp="RevealKey_Up" MouseLeave="RevealKey_Leave"/>
+                    <TextBlock x:Name="RevealedKey" Visibility="Collapsed" TextWrapping="Wrap"/>
+                    <TextBlock Text="* Key được mã hóa bằng DPAPI CurrentUser, gắn với tài khoản Windows hiện tại."
                                FontSize="11" Foreground="#64748B" Margin="0,4,0,0"/>
                 </StackPanel>
 
                 <!-- Chat Model -->
                 <StackPanel Margin="0,0,0,14">
                     <TextBlock Text="Tên Model Chat (Ví dụ: gemini-2.5-flash, gpt-4o-mini, llama-3.3-70b)" FontWeight="SemiBold" Margin="0,0,0,6"/>
-                    <TextBox Text="{Binding ChatModel, UpdateSourceTrigger=PropertyChanged}" 
+                    <TextBox Text="{Binding ChatModel, UpdateSourceTrigger=PropertyChanged}"
                              Style="{StaticResource RoundedTextBox}"/>
                 </StackPanel>
 
                 <!-- Base URL -->
                 <StackPanel Margin="0,0,0,14">
+                    <TextBlock Text="Model embedding (độc lập với model chat)" FontWeight="SemiBold"/>
+                    <TextBox Text="{Binding EmbeddingModel, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RoundedTextBox}"/>
+                    <CheckBox Content="Dùng provider này cho embedding/RAG" IsChecked="{Binding UseForEmbedding}" Margin="0,6"/>
+                    <TextBlock Text="Lưu provider chat khác vẫn giữ provider embedding đã chọn. Đổi profile embedding cần re-index." TextWrapping="Wrap" FontSize="11"/>
+                    <Button Content="Kiểm tra embedding (không lưu)" Command="{Binding TestEmbeddingCommand}"/>
+                    <Button Content="Hủy kiểm tra" Command="{Binding CancelCommand}"/>
+                </StackPanel>
+                <StackPanel Margin="0,0,0,14">
                     <TextBlock Text="Base URL tùy chỉnh (Dành cho Groq/Ollama hoặc Proxy)" FontWeight="SemiBold" Margin="0,0,0,6"/>
-                    <TextBox Text="{Binding BaseUrl, UpdateSourceTrigger=PropertyChanged}" 
+                    <TextBox Text="{Binding BaseUrl, UpdateSourceTrigger=PropertyChanged}"
                              Style="{StaticResource RoundedTextBox}"/>
                 </StackPanel>
 
@@ -158,7 +168,7 @@
         </ScrollViewer>
 
         <!-- Status Message -->
-        <Border Grid.Row="2" Background="#EFF6FF" BorderBrush="#BFDBFE" BorderThickness="1" CornerRadius="6" 
+        <Border Grid.Row="2" Background="#EFF6FF" BorderBrush="#BFDBFE" BorderThickness="1" CornerRadius="6"
                 Padding="12,8" Margin="0,16,0,16">
             <TextBlock Text="{Binding StatusMessage}" FontSize="12" Foreground="#1E40AF" TextWrapping="Wrap"/>
         </Border>
@@ -171,11 +181,11 @@
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <Button Grid.Column="0" Content="⚡ Kiểm tra kết nối" 
+            <Button Grid.Column="0" Content="⚡ Kiểm tra kết nối"
                     Command="{Binding TestConnectionCommand}"
                     Style="{StaticResource SecondaryButton}"/>
 
-            <Button Grid.Column="2" Content="💾 Lưu cấu hình" 
+            <Button Grid.Column="2" Content="💾 Lưu cấu hình"
                     Command="{Binding SaveCommand}"
                     Style="{StaticResource PrimaryButton}"/>
         </Grid>

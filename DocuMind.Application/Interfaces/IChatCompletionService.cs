@@ -5,8 +5,8 @@ namespace DocuMind.Application.Interfaces;
 public interface IChatCompletionService
 {
     AiProviderType ProviderType { get; }
-    Task<string> GenerateResponseAsync(string systemPrompt, string userPrompt, double temperature = 0.7, CancellationToken ct = default);
-    Task<float[]> GenerateEmbeddingAsync(string text, CancellationToken ct = default);
+    bool SupportsChat { get; }
+    Task<string> GenerateResponseAsync(string systemPrompt, string userPrompt, double temperature = 0.7, CancellationToken ct = default,
+        IReadOnlyList<DocuMind.Application.DTOs.ChatTurn>? history = null);
     Task<bool> TestConnectionAsync(CancellationToken ct = default);
 }
-
