@@ -1,0 +1,112 @@
+-- DOCUMIND SQLITE | baseline 355df3d | 2026-11-05
+-- SQL thuan, file UTF-8. Chi chay bang SQLite, KHONG chay trong SQL Server.
+-- DB Browser for SQLite: Open Database -> Execute SQL -> dan script -> Execute.
+-- Chon dung file: app luu documind_local.db canh exe (thu muc bin khi debug).
+-- Schema doi chieu AppDbContext.Database.GenerateCreateScript().
+-- CREATE IF NOT EXISTS chi bo qua doi tuong da co, KHONG nang cap schema cu.
+-- Sao luu DB va dong app truoc khi thay doi du lieu. Khong co DROP/DELETE du lieu that.
+-- PRAGMA foreign_keys phai bat tren MOI connection, ben ngoai transaction.
+PRAGMA foreign_keys = ON;
+
+-- 1. CAU TRUC VA INDEX
+BEGIN TRANSACTION;
+CREATE TABLE IF NOT EXISTS "ProviderSettings" (
+    "Id" INTEGER NOT NULL CONSTRAINT "PK_ProviderSettings" PRIMARY KEY AUTOINCREMENT,
+    "ProviderType" INTEGER NOT NULL,
+    "EncryptedApiKey" TEXT NOT NULL,
+    "BaseUrl" TEXT NOT NULL,
+    "ChatModel" TEXT NOT NULL,
+    "EmbeddingModel" TEXT NOT NULL,
+    "Temperature" REAL NOT NULL,
+    "IsActive" INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS "Workspaces" (
+    "Id" TEXT NOT NULL CONSTRAINT "PK_Workspaces" PRIMARY KEY,
+    "Name" TEXT NOT NULL,
+    "Description" TEXT NOT NULL,
+    "SystemPrompt" TEXT NOT NULL,
+    "CreatedAt" TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS "ChatMessages" (
+    "Id" TEXT NOT NULL CONSTRAINT "PK_ChatMessages" PRIMARY KEY,
+    "WorkspaceId" TEXT NOT NULL,
+    "Role" INTEGER NOT NULL,
+    "Content" TEXT NOT NULL,
+    "SourcesJson" TEXT NULL,
+    "Timestamp" TEXT NOT NULL,
+    CONSTRAINT "FK_ChatMessages_Workspaces_WorkspaceId"
+      FOREIGN KEY ("WorkspaceId") REFERENCES "Workspaces" ("Id") ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS "DocumentChunks" (
+    "Id" TEXT NOT NULL CONSTRAINT "PK_DocumentChunks" PRIMARY KEY,
+    "WorkspaceId" TEXT NOT NULL,
+    "FileName" TEXT NOT NULL,
+    "PageNumber" INTEGER NOT NULL,
+    "Content" TEXT NOT NULL,
+    "EmbeddingJson" TEXT NOT NULL,
+    "CreatedAt" TEXT NOT NULL,
+    CONSTRAINT "FK_DocumentChunks_Workspaces_WorkspaceId"
+      FOREIGN KEY ("WorkspaceId") REFERENCES "Workspaces" ("Id") ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS "IX_ChatMessages_WorkspaceId" ON "ChatMessages" ("WorkspaceId");
+CREATE INDEX IF NOT EXISTS "IX_DocumentChunks_WorkspaceId" ON "DocumentChunks" ("WorkspaceId");
+CREATE INDEX IF NOT EXISTS "IX_DocumentChunks_WorkspaceId_FileName" ON "DocumentChunks" ("WorkspaceId", "FileName");
+CREATE UNIQUE INDEX IF NOT EXISTS "IX_ProviderSettings_ProviderType" ON "ProviderSettings" ("ProviderType");
+
+-- 2. SEED BAT BUOC. Khong ghi de workspace da duoc sua.
+INSERT INTO "Workspaces" ("Id", "Name", "Description", "SystemPrompt", "CreatedAt")
+SELECT '11111111-1111-1111-1111-111111111111',
+       'Workspace Mặc Định',
+       'Không gian làm việc và tra cứu tài liệu thông minh cá nhân.',
+       'Bạn là trợ lý học tập và nghiên cứu tài liệu chuẩn xác. Hãy trả lời súc tích, mạch lạc và bám sát tài liệu.',
+       '2026-01-01 00:00:00'
+WHERE NOT EXISTS (SELECT 1 FROM "Workspaces" WHERE "Id" = '11111111-1111-1111-1111-111111111111');
+COMMIT;
+
+-- Enum ProviderType: 1 Gemini, 2 OpenAI, 3 Groq, 4 OllamaLocal.
+-- Enum Role: 1 System, 2 User, 3 Assistant. ChatMode: 1 Direct, 2 Rag (chua luu vao bang).
+-- Guid va thoi gian do code C# tao; schema khong co DEFAULT NEWID/CURRENT_TIMESTAMP.
+-- MaxLength cua EF khong thanh gioi han do dai TEXT tren SQLite.
+
+-- 3. QUERY DOC DU LIEU
+SELECT "Id", "Name", "Description", "CreatedAt" FROM "Workspaces" ORDER BY "CreatedAt";
+SELECT "WorkspaceId", "FileName", COUNT(*) AS "ChunkCount",
+       MIN("PageNumber") AS "FirstPage", MAX("PageNumber") AS "LastPage"
+FROM "DocumentChunks" GROUP BY "WorkspaceId", "FileName" ORDER BY "FileName";
+SELECT w."Name", COUNT(c."Id") AS "ChunkCount", COUNT(DISTINCT c."FileName") AS "FileCount"
+FROM "Workspaces" w LEFT JOIN "DocumentChunks" c ON c."WorkspaceId" = w."Id"
+GROUP BY w."Id", w."Name";
+SELECT "FileName", "PageNumber", "Content", length("EmbeddingJson") AS "VectorJsonChars"
+FROM "DocumentChunks" WHERE "WorkspaceId" = '11111111-1111-1111-1111-111111111111'
+ORDER BY "FileName", "PageNumber" LIMIT 20;
+-- Chi hien metadata; KHONG SELECT EncryptedApiKey de chia se ra ngoai.
+SELECT "ProviderType", "ChatModel", "EmbeddingModel", "BaseUrl", "Temperature", "IsActive"
+FROM "ProviderSettings" WHERE "IsActive" = 1;
+SELECT COUNT(*) AS "ActiveProviderCount" FROM "ProviderSettings" WHERE "IsActive" = 1;
+-- ChatMessages rong la dung voi UI hien tai: app chua luu chat xuong DB.
+SELECT "WorkspaceId", "Role", "Content", "Timestamp" FROM "ChatMessages" ORDER BY "Timestamp" LIMIT 20;
+SELECT c."Id" AS "OrphanChunk" FROM "DocumentChunks" c
+LEFT JOIN "Workspaces" w ON w."Id" = c."WorkspaceId" WHERE w."Id" IS NULL;
+PRAGMA foreign_key_check;
+PRAGMA table_info('DocumentChunks');
+PRAGMA index_list('DocumentChunks');
+
+-- 4. OPTIONAL CRUD BEGIN
+-- Vi du chi dung workspace rieng, vector GIA de minh hoa schema, KHONG dung RAG.
+-- Ca khoi tu rollback; chay tron khoi. Doi ROLLBACK thanh COMMIT chi khi chu dong muon luu.
+BEGIN TRANSACTION;
+INSERT INTO "Workspaces" VALUES
+('dddddddd-dddd-dddd-dddd-dddddddddddd', 'Không gian thực hành', 'Dữ liệu mẫu', 'Trợ lý ôn tập', '2026-11-05 00:00:00');
+INSERT INTO "DocumentChunks" VALUES
+('cccccccc-cccc-cccc-cccc-cccccccccccc', 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'ôn tập.txt', 1,
+ 'MVVM tách giao diện và trạng thái trình bày.', '[0.1,0.2]', '2026-11-05 00:00:00');
+INSERT INTO "ChatMessages" VALUES
+('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'dddddddd-dddd-dddd-dddd-dddddddddddd', 2, 'MVVM là gì?', NULL, '2026-11-05 00:00:00');
+UPDATE "Workspaces" SET "Description" = 'Đã cập nhật mô tả' WHERE "Id" = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
+SELECT * FROM "Workspaces" WHERE "Id" = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
+DELETE FROM "Workspaces" WHERE "Id" = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
+SELECT COUNT(*) AS "RemainingSampleChunks" FROM "DocumentChunks" WHERE "WorkspaceId" = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
+ROLLBACK;
+-- OPTIONAL CRUD END
+-- API key: nhap qua Settings. DPAPI CurrentUser gan voi tai khoan Windows/bo key may;
+-- copy ciphertext sang may/tai khoan khac khong dam bao giai ma duoc. Khong chen key Base64.
