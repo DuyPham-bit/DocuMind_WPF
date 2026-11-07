@@ -1,5 +1,6 @@
 <Solution>
   <Project Path="DocuMind.Application/DocuMind.Application.csproj" />
+  <Project Path="DocuMind.Bootstrapper/DocuMind.Bootstrapper.csproj" />
   <Project Path="DocuMind.Domain/DocuMind.Domain.csproj" />
   <Project Path="DocuMind.Infrastructure/DocuMind.Infrastructure.csproj" />
   <Project Path="DocuMind.Tests/DocuMind.Tests.csproj" />
