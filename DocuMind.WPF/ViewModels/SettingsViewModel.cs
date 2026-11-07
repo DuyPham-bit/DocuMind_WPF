@@ -14,10 +14,10 @@ public partial class SettingsViewModel(IChatProviderFactory providerFactory) : O
     private bool _initializing;
     private CancellationTokenSource? _operation;
     public ObservableCollection<AiProviderType> AvailableProviders { get; } = new(Enum.GetValues<AiProviderType>());
-    [ObservableProperty] private AiProviderType _selectedProvider = AiProviderType.Gemini;
+    [ObservableProperty] private AiProviderType _selectedProvider = AiProviderType.OpenRouter;
     [ObservableProperty] private string _apiKey = "";
-    [ObservableProperty] private string _chatModel = "gemini-2.5-flash";
-    [ObservableProperty] private string _embeddingModel = "text-embedding-004";
+    [ObservableProperty] private string _chatModel = "";
+    [ObservableProperty] private string _embeddingModel = "";
     [ObservableProperty] private string _baseUrl = "";
     [ObservableProperty] private double _temperature = 0.7;
     [ObservableProperty] private bool _useForEmbedding;
@@ -37,6 +37,7 @@ public partial class SettingsViewModel(IChatProviderFactory providerFactory) : O
         TestConnectionCommand.NotifyCanExecuteChanged();
         TestEmbeddingCommand.NotifyCanExecuteChanged();
         SaveCommand.NotifyCanExecuteChanged();
+        UseOpenRouterCommand.NotifyCanExecuteChanged();
     }
 
     public async Task InitializeAsync()
@@ -61,6 +62,16 @@ public partial class SettingsViewModel(IChatProviderFactory providerFactory) : O
         if (!_initializing) _ = LoadDraftAsync(value);
     }
 
+    [RelayCommand(CanExecute = nameof(IsEditable))]
+    private async Task UseOpenRouterAsync()
+    {
+        if (SelectedProvider == AiProviderType.OpenRouter) return;
+        _initializing = true;
+        try { SelectedProvider = AiProviderType.OpenRouter; }
+        finally { _initializing = false; }
+        await LoadDraftAsync(AiProviderType.OpenRouter);
+    }
+
     public async Task LoadDraftAsync(AiProviderType provider)
     {
         var generation = ++_generation;
@@ -74,6 +85,7 @@ public partial class SettingsViewModel(IChatProviderFactory providerFactory) : O
             ApiKey = draft.ApiKey; ChatModel = draft.ChatModel; EmbeddingModel = draft.EmbeddingModel;
             BaseUrl = draft.BaseUrl; Temperature = draft.Temperature; UseForEmbedding = draft.UseForEmbedding;
             StatusMessage = draft.KeyNeedsReplacement ? "Không thể giải mã key cũ bằng DPAPI CurrentUser. Hãy nhập lại key và Lưu; các trường cấu hình khác đã được giữ lại."
+                : provider == AiProviderType.OpenRouter ? "Dán API key OpenRouter, kiểm tra kết nối và embedding rồi Lưu cấu hình. Model miễn phí có giới hạn lượt gọi."
                 : "Cấu hình nháp. Kiểm tra không lưu cấu hình; chỉ Lưu mới kích hoạt provider chat.";
         }
         catch (Exception ex)

@@ -108,6 +108,10 @@
             <TextBlock Text="Cấu Hình Nền Tảng AI" FontSize="18" FontWeight="Bold" Foreground="#0F172A"/>
             <TextBlock Text="Đổi nhà cung cấp, thiết lập API Key được mã hóa chuẩn Windows DPAPI."
                        FontSize="12" Foreground="#64748B" Margin="0,4,0,0"/>
+            <Button Content="Dùng OpenRouter" Command="{Binding UseOpenRouterCommand}"
+                    Style="{StaticResource SecondaryButton}" HorizontalAlignment="Left" Width="180" Margin="0,12,0,0"/>
+            <TextBlock Text="OpenRouter có sẵn model chat, embedding và URL. Bạn chỉ cần dán API key."
+                       FontSize="12" Foreground="#64748B" TextWrapping="Wrap" Margin="0,6,0,0"/>
         </StackPanel>
 
         <!-- Form fields -->
@@ -135,7 +139,7 @@
 
                 <!-- Chat Model -->
                 <StackPanel Margin="0,0,0,14">
-                    <TextBlock Text="Tên Model Chat (Ví dụ: gemini-2.5-flash, gpt-4o-mini, llama-3.3-70b)" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                    <TextBlock Text="Tên Model Chat (Ví dụ: openrouter/free, gpt-4o-mini)" FontWeight="SemiBold" Margin="0,0,0,6"/>
                     <TextBox Text="{Binding ChatModel, UpdateSourceTrigger=PropertyChanged}"
                              Style="{StaticResource RoundedTextBox}"/>
                 </StackPanel>
@@ -150,7 +154,7 @@
                     <Button Content="Hủy kiểm tra" Command="{Binding CancelCommand}"/>
                 </StackPanel>
                 <StackPanel Margin="0,0,0,14">
-                    <TextBlock Text="Base URL tùy chỉnh (Dành cho Groq/Ollama hoặc Proxy)" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                    <TextBlock Text="Base URL (tự điền theo nhà cung cấp)" FontWeight="SemiBold" Margin="0,0,0,6"/>
                     <TextBox Text="{Binding BaseUrl, UpdateSourceTrigger=PropertyChanged}"
                              Style="{StaticResource RoundedTextBox}"/>
                 </StackPanel>

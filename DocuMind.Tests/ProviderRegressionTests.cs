@@ -15,6 +15,65 @@ namespace DocuMind.Tests;
 public class ProviderRegressionTests
 {
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task OpenRouterCanBeConfiguredByPastingOnlyAKeyWithoutChangingSavedSettingsUntilSave(bool hasExistingProvider)
+    {
+        using var fixture = new SqliteFixture();
+        var handler = new FakeHandler();
+        handler.Response = _ => new(HttpStatusCode.OK)
+        {
+            Content = new StringContent(handler.Requests.Last().Url.AbsolutePath.EndsWith("/embeddings")
+                ? "{\"data\":[{\"embedding\":[1,0]}]}"
+                : "{\"choices\":[{\"message\":{\"content\":\"ok\"}}]}")
+        };
+        using var http = new HttpClient(handler);
+        var factory = new ChatProviderFactory(fixture, http, new FakeSecrets());
+        if (hasExistingProvider)
+            await factory.SaveAsync(new(AiProviderType.Gemini, "previous-key", "previous-chat", "previous-embedding", UseForEmbedding: true));
+
+        using var viewModel = new SettingsViewModel(factory);
+        await viewModel.InitializeAsync();
+        if (hasExistingProvider) Assert.Equal(AiProviderType.Gemini, viewModel.SelectedProvider);
+        await viewModel.UseOpenRouterCommand.ExecuteAsync(null);
+        Assert.Contains(AiProviderType.OpenRouter, viewModel.AvailableProviders);
+        Assert.Equal(AiProviderType.OpenRouter, viewModel.SelectedProvider);
+        Assert.Empty(viewModel.ApiKey);
+        Assert.Equal("openrouter/free", viewModel.ChatModel);
+        Assert.Equal("nvidia/nemotron-3-embed-1b:free", viewModel.EmbeddingModel);
+        Assert.Equal("https://openrouter.ai/api/v1", viewModel.BaseUrl);
+        Assert.Equal(.3, viewModel.Temperature);
+        Assert.True(viewModel.UseForEmbedding);
+
+        viewModel.ApiKey = "test-openrouter-key";
+        // Selecting the shortcut again must keep a key the user has just pasted.
+        await viewModel.UseOpenRouterCommand.ExecuteAsync(null);
+        Assert.Equal("test-openrouter-key", viewModel.ApiKey);
+        await viewModel.TestConnectionCommand.ExecuteAsync(null);
+        Assert.True(viewModel.IsSuccessStatus);
+        await viewModel.TestEmbeddingCommand.ExecuteAsync(null);
+        Assert.True(viewModel.IsSuccessStatus);
+        var previous = await factory.GetActiveSettingAsync();
+        if (hasExistingProvider) Assert.Equal(AiProviderType.Gemini, previous!.ProviderType);
+        else Assert.Null(previous);
+
+        Assert.Equal(2, handler.Requests.Count);
+        Assert.Equal("https://openrouter.ai/api/v1/chat/completions", handler.Requests[0].Url.AbsoluteUri);
+        Assert.Equal("https://openrouter.ai/api/v1/embeddings", handler.Requests[1].Url.AbsoluteUri);
+        Assert.All(handler.Requests, request => Assert.Equal("test-openrouter-key", request.Key));
+        using var chat = JsonDocument.Parse(handler.Requests[0].Body);
+        using var embedding = JsonDocument.Parse(handler.Requests[1].Body);
+        Assert.Equal(viewModel.ChatModel, chat.RootElement.GetProperty("model").GetString());
+        Assert.Equal(viewModel.EmbeddingModel, embedding.RootElement.GetProperty("model").GetString());
+
+        await viewModel.SaveCommand.ExecuteAsync(null);
+        Assert.True(viewModel.IsSuccessStatus);
+        Assert.Equal(AiProviderType.OpenRouter, (await factory.GetChatSessionAsync()).Provider);
+        Assert.Equal(AiProviderType.OpenRouter, (await factory.GetEmbeddingSessionAsync()).Provider);
+        Assert.Equal(viewModel.CaptureDraft(), await factory.LoadDraftAsync(AiProviderType.OpenRouter));
+    }
+
+    [Theory]
     [InlineData("pass")]
     [InlineData("fail")]
     [InlineData("cancel")]
@@ -157,6 +216,7 @@ public class ProviderRegressionTests
     [InlineData(AiProviderType.Groq)]
     [InlineData(AiProviderType.OllamaLocal)]
     [InlineData(AiProviderType.Gemini)]
+    [InlineData(AiProviderType.OpenRouter)]
     public async Task HttpPayloadContainsTemperatureAndNoKeyInUrl(AiProviderType provider)
     {
         using var fixture = new SqliteFixture(); var handler = new FakeHandler(); using var http = new HttpClient(handler);
@@ -176,6 +236,7 @@ public class ProviderRegressionTests
     [InlineData(AiProviderType.OpenAI)]
     [InlineData(AiProviderType.Gemini)]
     [InlineData(AiProviderType.OllamaLocal)]
+    [InlineData(AiProviderType.OpenRouter)]
     public async Task EmbeddingUsesConfiguredEndpointAndModel(AiProviderType provider)
     {
         using var fixture = new SqliteFixture(); var handler = new FakeHandler(); using var http = new HttpClient(handler);
