@@ -103,6 +103,8 @@ public sealed class ChatProviderFactory(IDbContextFactory<AppDbContext> contexts
         AiProviderType.OpenAI => new(provider, "", "gpt-4o-mini", "text-embedding-3-small"),
         AiProviderType.Groq => new(provider, "", "llama-3.3-70b-versatile"),
         AiProviderType.OllamaLocal => new(provider, "", "llama3"),
+        AiProviderType.OpenRouter => new(provider, "", "openrouter/free", "nvidia/nemotron-3-embed-1b:free",
+            "https://openrouter.ai/api/v1", Temperature: .3, UseForEmbedding: true),
         _ => throw new NotSupportedException("Provider không được hỗ trợ.")
     };
 
@@ -112,6 +114,7 @@ public sealed class ChatProviderFactory(IDbContextFactory<AppDbContext> contexts
         AiProviderType.OpenAI => "https://api.openai.com/v1",
         AiProviderType.Groq => "https://api.groq.com/openai/v1",
         AiProviderType.OllamaLocal => "http://localhost:11434/v1",
+        AiProviderType.OpenRouter => "https://openrouter.ai/api/v1",
         _ => throw new NotSupportedException("Provider không được hỗ trợ.")
     } : url.Trim().TrimEnd('/');
 
