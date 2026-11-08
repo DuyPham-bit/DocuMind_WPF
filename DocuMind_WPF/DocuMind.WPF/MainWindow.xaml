@@ -271,6 +271,8 @@
                         <CheckBox IsChecked="{Binding UseRagMode}" Style="{StaticResource RagToggle}" Margin="0,0,8,0">
                             <TextBlock Text="{Binding Source={x:Static loc:UiText.Current}, Path=SearchDocumentsLabel}" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource InkPrimaryBrush}"/>
                         </CheckBox>
+                        <Button Content="{Binding Source={x:Static loc:UiText.Current}, Path=QuizButton}" Command="{Binding OpenQuizCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"
+                                ToolTip="{Binding Source={x:Static loc:UiText.Current}, Path=QuizButtonTooltip}"/>
                         <Button Content="{Binding Source={x:Static loc:UiText.Current}, Path=ExportButton}" Command="{Binding ExportMarkdownCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"/>
                         <Button Content="{Binding Source={x:Static loc:UiText.Current}, Path=NewChatButton}" Command="{Binding ClearChatCommand}" Style="{StaticResource SecondaryButton}"/>
                     </WrapPanel>

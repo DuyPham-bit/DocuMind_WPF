@@ -12,6 +12,7 @@ public class AppDbContext : DbContext
     public DbSet<Document> Documents => Set<Document>();
     public DbSet<DocumentVersion> DocumentVersions => Set<DocumentVersion>();
     public DbSet<EmbeddingProfile> EmbeddingProfiles => Set<EmbeddingProfile>();
+    public DbSet<QuizAttempt> QuizAttempts => Set<QuizAttempt>();
 
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
     {
@@ -32,6 +33,14 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<ProviderSetting>().HasIndex(p => p.IsActive).IsUnique().HasFilter("\"IsActive\" = 1");
         modelBuilder.Entity<ProviderSetting>().HasIndex(p => p.IsEmbeddingActive).IsUnique().HasFilter("\"IsEmbeddingActive\" = 1");
         modelBuilder.Entity<ChatMessage>().HasIndex(m => new { m.WorkspaceId, m.ConversationId, m.Timestamp });
+        modelBuilder.Entity<QuizAttempt>(entity =>
+        {
+            entity.HasKey(a => a.Id);
+            entity.Property(a => a.Topic).IsRequired().HasMaxLength(300);
+            entity.Property(a => a.QuestionsJson).IsRequired();
+            entity.HasOne(a => a.Workspace).WithMany().HasForeignKey(a => a.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(a => new { a.WorkspaceId, a.CreatedAt });
+        });
 
         // Workspace configuration
         modelBuilder.Entity<Workspace>(entity =>

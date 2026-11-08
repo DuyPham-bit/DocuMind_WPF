@@ -82,6 +82,10 @@ public sealed partial class UiText : ObservableObject
     public string ManageProvidersButton => IsVietnamese ? "Cài đặt API & Model" : "Manage providers";
     public string KnowledgeWorkspaceHeader => IsVietnamese ? "KHÔNG GIAN TRI THỨC" : "KNOWLEDGE WORKSPACE";
     public string SearchDocumentsLabel => IsVietnamese ? "Tra cứu tài liệu (RAG)" : "Search documents";
+    public string QuizButton => IsVietnamese ? "Quiz ôn tập" : "Study quiz";
+    public string QuizButtonTooltip => IsVietnamese
+        ? "AI tạo câu trắc nghiệm từ tài liệu của workspace, app chấm điểm và lưu lịch sử"
+        : "AI writes multiple-choice questions from this workspace's documents; the app grades them and keeps a history";
     public string ExportButton => IsVietnamese ? "Xuất MD" : "Export";
     public string NewChatButton => IsVietnamese ? "Chat mới" : "New chat";
     public string EmptyTitle => IsVietnamese ? "Sẵn sàng hỗ trợ bạn" : "Ready when you are";

@@ -78,6 +78,7 @@ public partial class MainViewModel : ObservableObject
         UploadDocumentCommand.NotifyCanExecuteChanged(); DeleteDocumentCommand.NotifyCanExecuteChanged();
         SendMessageCommand.NotifyCanExecuteChanged(); ClearChatCommand.NotifyCanExecuteChanged();
         CreateWorkspaceCommand.NotifyCanExecuteChanged(); SaveWorkspaceCommand.NotifyCanExecuteChanged(); DeleteWorkspaceCommand.NotifyCanExecuteChanged();
+        OpenQuizCommand.NotifyCanExecuteChanged();
     }
 
     public async Task InitializeAsync()
@@ -374,4 +375,8 @@ public partial class MainViewModel : ObservableObject
         catch (Exception ex) { BusyStatus = UserErrors.Describe(ex); }
     }
     [RelayCommand] private void OpenSettings() => OpenSettingsAction?.Invoke();
+
+    public Action<Workspace>? OpenQuizAction { get; set; }
+    [RelayCommand(CanExecute = nameof(CanWork))]
+    private void OpenQuiz() { if (SelectedWorkspace != null) OpenQuizAction?.Invoke(SelectedWorkspace); }
 }

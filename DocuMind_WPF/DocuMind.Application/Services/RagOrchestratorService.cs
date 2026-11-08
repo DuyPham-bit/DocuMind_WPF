@@ -73,24 +73,8 @@ public sealed class RagOrchestratorService(IChatProviderFactory providers, IDocu
     public async Task<ChatResultDto> ChatWithRagAsync(Guid workspaceId, string systemPrompt, string question,
         int topK = 4, CancellationToken ct = default, ChatSession? session = null, IReadOnlyList<ChatTurn>? history = null)
     {
-        var embedding = await providers.GetEmbeddingSessionAsync(ct);
-        var query = await embedding.Service.GenerateEmbeddingAsync(question, ct);
-        if (!VectorMathHelper.IsValidVector(query)) return NoSources();
-        var chunks = await documents.GetCompatibleChunksAsync(workspaceId, embedding, query.Length, ct);
-        var scored = new List<(DocumentChunk Chunk, float Score)>();
-        foreach (var chunk in chunks)
-        {
-            float[]? vector;
-            try { vector = JsonSerializer.Deserialize<float[]>(chunk.EmbeddingJson); }
-            catch (JsonException) { continue; } // Corrupt indexes cannot produce citations.
-            if (!VectorMathHelper.IsValidVector(vector) || vector!.Length != query.Length) continue;
-            var score = VectorMathHelper.CosineSimilarity(query, vector);
-            if (score >= MinimumScore) scored.Add((chunk, score));
-        }
-        var selected = scored.OrderByDescending(x => x.Score).ThenBy(x => x.Chunk.Id).Take(Math.Clamp(topK, 1, 20)).ToList();
-        if (selected.Count == 0) return NoSources();
-        var sources = selected.Select(x => new RagSourceDto(x.Chunk.FileName, x.Chunk.PageNumber, x.Chunk.Content, x.Score,
-            x.Chunk.DocumentVersion!.DocumentId, x.Chunk.DocumentVersion.Document!.SourcePath)).ToList();
+        var sources = await RetrieveSourcesAsync(workspaceId, question, topK, ct);
+        if (sources.Count == 0) return NoSources();
         var delimiter = "DOCUMENT_DATA_" + Guid.NewGuid().ToString("N");
         var context = new StringBuilder();
         foreach (var source in sources)
@@ -106,6 +90,55 @@ public sealed class RagOrchestratorService(IChatProviderFactory providers, IDocu
         session ??= await providers.GetChatSessionAsync(ct);
         var answer = await session.Service.GenerateResponseAsync(instructions, prompt, session.Temperature, ct, history);
         return new(answer, sources);
+    }
+
+    /// <summary>
+    /// Top-K đoạn tài liệu tương thích với profile embedding hiện tại, đạt ngưỡng <see cref="MinimumScore"/>.
+    /// Trả về danh sách rỗng khi không có căn cứ; dùng chung cho chat RAG và Quiz.
+    /// </summary>
+    public async Task<List<RagSourceDto>> RetrieveSourcesAsync(Guid workspaceId, string query, int topK = 4, CancellationToken ct = default)
+    {
+        var embedding = await providers.GetEmbeddingSessionAsync(ct);
+        var vectorQuery = await embedding.Service.GenerateEmbeddingAsync(query, ct);
+        if (!VectorMathHelper.IsValidVector(vectorQuery)) return [];
+        var chunks = await documents.GetCompatibleChunksAsync(workspaceId, embedding, vectorQuery.Length, ct);
+        var scored = new List<(DocumentChunk Chunk, float Score)>();
+        foreach (var chunk in chunks)
+        {
+            float[]? vector;
+            try { vector = JsonSerializer.Deserialize<float[]>(chunk.EmbeddingJson); }
+            catch (JsonException) { continue; } // Corrupt indexes cannot produce citations.
+            if (!VectorMathHelper.IsValidVector(vector) || vector!.Length != vectorQuery.Length) continue;
+            var score = VectorMathHelper.CosineSimilarity(vectorQuery, vector);
+            if (score >= MinimumScore) scored.Add((chunk, score));
+        }
+        return scored.OrderByDescending(x => x.Score).ThenBy(x => x.Chunk.Id).Take(Math.Clamp(topK, 1, 20))
+            .Select(x => new RagSourceDto(x.Chunk.FileName, x.Chunk.PageNumber, x.Chunk.Content, x.Score,
+                x.Chunk.DocumentVersion!.DocumentId, x.Chunk.DocumentVersion.Document!.SourcePath)).ToList();
+    }
+
+    /// <summary>
+    /// Lấy mẫu rải đều các đoạn tài liệu tương thích (không xếp theo độ khớp), dùng khi ôn tập toàn bộ workspace.
+    /// Chỉ trả đoạn có vector hợp lệ để nguồn luôn thuộc index đang dùng được.
+    /// </summary>
+    public async Task<List<RagSourceDto>> SampleSourcesAsync(Guid workspaceId, int count = 8, CancellationToken ct = default)
+    {
+        var embedding = await providers.GetEmbeddingSessionAsync(ct);
+        var probe = await embedding.Service.GenerateEmbeddingAsync("tổng quan nội dung tài liệu", ct);
+        if (!VectorMathHelper.IsValidVector(probe)) return [];
+        var chunks = (await documents.GetCompatibleChunksAsync(workspaceId, embedding, probe.Length, ct))
+            .Where(chunk =>
+            {
+                try { var v = JsonSerializer.Deserialize<float[]>(chunk.EmbeddingJson); return VectorMathHelper.IsValidVector(v) && v!.Length == probe.Length; }
+                catch (JsonException) { return false; }
+            })
+            .OrderBy(c => c.DocumentVersion!.DocumentId).ThenBy(c => c.ChunkIndex).ToList();
+        if (chunks.Count == 0) return [];
+        count = Math.Clamp(count, 1, 20);
+        var step = Math.Max(1.0, (double)chunks.Count / count);
+        return Enumerable.Range(0, Math.Min(count, chunks.Count)).Select(i => chunks[(int)(i * step)])
+            .Select(c => new RagSourceDto(c.FileName, c.PageNumber, c.Content, 0, c.DocumentVersion!.DocumentId, c.DocumentVersion.Document!.SourcePath))
+            .ToList();
     }
 
     private static ChatResultDto NoSources() => new(AppText.T("There is not enough evidence in compatible documents to answer. Upload a document or re-index with the current embedding profile.",

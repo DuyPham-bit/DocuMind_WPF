@@ -5,6 +5,7 @@ Tài liệu hiện hành ngày 14/11/2026: [Đặc tả đầy đủ dự án Wo
 Lịch sử đợt sửa trước: [Sửa lỗi, dữ liệu và nghiệm thu](05_Fixes_va_Nghiem_thu.md), kiểm tra ngày 05/11/2026 trên Windows, .NET 10 và SQLite thật.
 
 - Hướng đi của nhóm: **mỗi thành viên dùng Ollama local**, xem [cài đặt và cấu hình miễn phí](06_Ollama_Local.md).
+- Tính năng học tập: [Quiz ôn tập từ tài liệu](07_Quiz_On_Tap.md) — AI ra đề trắc nghiệm, app chấm điểm và lưu lịch sử.
 - Chạy app: `dotnet run --project DocuMind.WPF`.
 - Kiểm thử: `dotnet test DocuMind.slnx`.
 - DB hiện hành: `%LOCALAPPDATA%\DocuMind\documind_local.db`, nâng cấp bằng EF migrations và backup tự động trước thay đổi schema.
