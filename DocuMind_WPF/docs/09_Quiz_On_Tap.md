@@ -5,7 +5,7 @@ Tính năng chủ đề học tập của DocuMind: AI soạn câu trắc nghi�
 ## Cách dùng
 
 1. Cấu hình provider có chat **và** embedding (ví dụ OpenRouter hoặc Ollama local, xem [06_Ollama_Local.md](06_Ollama_Local.md)), rồi nạp tài liệu vào workspace.
-2. Bấm **📝 Quiz ôn tập** trên thanh trên cùng của cửa sổ chính.
+2. Bấm **Quiz ôn tập** (giao diện tiếng Anh: **Study quiz**) trên thanh trên cùng của cửa sổ chính.
 3. Nhập **chủ đề** (ví dụ "Dependency Injection") để lấy các đoạn liên quan nhất, hoặc để trống để lấy mẫu rải đều toàn bộ tài liệu. Chọn số câu (3/5/7/10) rồi bấm **✨ Tạo quiz**.
 4. Chọn đáp án, bấm **Nộp bài**. Đáp án đúng tô xanh, lựa chọn sai tô đỏ; mỗi câu hiện giải thích và nguồn (rê chuột vào nguồn để xem đoạn trích).
 5. **↺ Làm lại** xóa lựa chọn để làm lại cùng bộ câu; mỗi lần nộp là một dòng mới trong **Lịch sử ôn tập**.
@@ -39,7 +39,7 @@ QuizWindow (View) ── QuizViewModel ── QuizService ──┬─ RagOrches
 
 ## Kiểm thử
 
-`DocuMind.Tests/QuizTests.cs` (15 test, không dùng API thật): parse/loại JSON lỗi, chấm điểm, ranh giới prompt-injection và temperature, không gọi AI khi chưa có tài liệu, lưu lịch sử mới nhất trước và cascade khi xóa workspace, luồng ViewModel tạo → nộp → làm lại, và STA test render `QuizWindow` với RadioButton tách nhóm.
+`DocuMind.Tests/QuizTests.cs` (16 test, không dùng API thật): parse/loại JSON lỗi, chấm điểm, ranh giới prompt-injection và temperature, không gọi AI khi chưa có tài liệu, lưu lịch sử mới nhất trước và cascade khi xóa workspace, luồng ViewModel tạo → nộp → làm lại, và STA test render `QuizWindow` với RadioButton tách nhóm.
 
 ```powershell
 dotnet test DocuMind.slnx --filter FullyQualifiedName~QuizTests
