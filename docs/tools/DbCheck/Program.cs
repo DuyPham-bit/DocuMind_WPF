@@ -73,7 +73,7 @@ foreach (var entity in db.Model.GetEntityTypes())
         Require(Convert.ToInt32(check.ExecuteScalar()) >= 1, "foreign key " + table);
     }
 }
-Require(db.Workspaces.Single().Name == "Workspace Mặc Định", "Unicode seed");
+Require(db.Workspaces.Single().Name == "My Workspace", "current translated seed");
 Require(!db.Database.GetPendingMigrations().Any(), "all migrations applied");
 using (var transaction = db.Database.BeginTransaction())
 {
@@ -97,7 +97,7 @@ using (var foreignKeys = connection.CreateCommand())
     using var reader = foreignKeys.ExecuteReader();
     Require(!reader.Read(), "foreign_key_check");
 }
-Console.WriteLine("SQLite PASS: generated migrations, schema, indexes, FK, Unicode seed, rollback, cascade. Real app database was not opened.");
+Console.WriteLine("SQLite PASS: generated migrations, schema, indexes, FK, translated seed, Unicode data, rollback, cascade. Real app database was not opened.");
 
 static void Require(bool value, string description)
 {

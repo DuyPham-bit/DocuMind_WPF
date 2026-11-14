@@ -190,3 +190,17 @@ INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
 VALUES ('20261105160847_PreserveLegacyIndexData', '10.0.14');
 
 COMMIT;
+
+BEGIN TRANSACTION;
+UPDATE Workspaces
+SET Name = 'My Workspace',
+    Description = 'A personal workspace for document research and knowledge discovery.',
+    SystemPrompt = 'You are a precise assistant for document research and learning. Keep answers clear, concise, and grounded in the available documents.'
+WHERE Id = '11111111-1111-1111-1111-111111111111'
+  AND Name = 'Workspace Mặc Định'
+  AND SystemPrompt = 'Bạn là trợ lý học tập và nghiên cứu tài liệu chuẩn xác. Hãy trả lời súc tích, mạch lạc và bám sát tài liệu.';
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261114120000_TranslateDefaultWorkspace', '10.0.14');
+
+COMMIT;

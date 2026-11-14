@@ -30,12 +30,32 @@ public class WpfSmokeTests
                 main.Show();
                 mainVm.ChatMessages.Add(new() { Role = DocuMind.Domain.Enums.MessageRole.Assistant, Content = "# Title\n**Bold** and `code`\n- Item\n```\nsafe code\n```" });
                 main.UpdateLayout();
+                mainVm.BusyStatus = "The AI provider returned HTTP 401. Check the key or model, then try again.";
+                mainVm.IsBusy = false;
+                main.Dispatcher.Invoke(() => { }, DispatcherPriority.DataBind);
+                main.UpdateLayout();
+                Assert.Contains(Descendants(main).OfType<TextBlock>(),
+                    block => block.Text == mainVm.BusyStatus && block.IsVisible);
+                var status = Descendants(main).OfType<TextBlock>().Single(block => block.Text == mainVm.BusyStatus && block.IsVisible);
+                var statusBounds = status.TransformToAncestor(main).TransformBounds(new Rect(status.RenderSize));
+                var chat = (ScrollViewer)main.FindName("ChatScrollViewer");
+                var chatBounds = chat.TransformToAncestor(main).TransformBounds(new Rect(chat.RenderSize));
+                Assert.True(statusBounds.Top >= chatBounds.Bottom, "Status must not cover the chat messages.");
                 var markdown = Descendants(main).OfType<DocuMind.WPF.Controls.MarkdownView>().Single();
                 var rendered = new TextRange(markdown.Document.ContentStart, markdown.Document.ContentEnd).Text;
                 Assert.Contains("Title", rendered); Assert.Contains("Bold and code", rendered); Assert.Contains("safe code", rendered);
                 var settingsVm = new SettingsViewModel(providers);
                 var settings = new SettingsDialog(settingsVm) { Owner = main };
                 settings.Show();
+                settings.Width = settings.MinWidth;
+                settings.UpdateLayout();
+                var embeddingButton = Descendants(settings).OfType<Button>().Single(b => Equals(b.Content, "Test embedding"));
+                var viewport = Descendants(settings).OfType<ScrollViewer>().First(v => v.Content is StackPanel);
+                var bounds = embeddingButton.TransformToAncestor(viewport).TransformBounds(new Rect(embeddingButton.RenderSize));
+                Assert.True(embeddingButton.ActualWidth >= 80,
+                    $"Embedding test button must remain usable: width {embeddingButton.ActualWidth}.");
+                Assert.True(bounds.Left >= 0 && bounds.Right <= viewport.ActualWidth,
+                    $"Embedding test button must fit the viewport: {bounds}; width {viewport.ActualWidth}.");
                 Assert.IsType<PasswordBox>(settings.FindName("KeyBox"));
                 settings.Close();
                 Assert.True(main.IsVisible);
