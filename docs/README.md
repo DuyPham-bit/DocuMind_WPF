@@ -1,6 +1,8 @@
 # DocuMind — tài liệu vận hành
 
-Hướng dẫn hiện hành: [Sửa lỗi, dữ liệu và nghiệm thu](05_Fixes_va_Nghiem_thu.md). Bản sửa được kiểm tra ngày 05/11/2026 trên Windows, .NET 10 và SQLite thật.
+Tài liệu hiện hành ngày 14/11/2026: [Đặc tả đầy đủ dự án Word](07_Dac_ta_du_an.docx), [nguồn Markdown](07_Dac_ta_du_an.md) và [review cuối cùng](08_Review_cuoi.md). Đặc tả bao gồm kiến trúc, dữ liệu, toàn bộ luồng, vận hành và giới hạn. Đợt review sửa lỗi thông báo bị ẩn sau thao tác và đồng bộ SQLite script với migration mới nhất; 68 test pass.
+
+Lịch sử đợt sửa trước: [Sửa lỗi, dữ liệu và nghiệm thu](05_Fixes_va_Nghiem_thu.md), kiểm tra ngày 05/11/2026 trên Windows, .NET 10 và SQLite thật.
 
 - Hướng đi của nhóm: **mỗi thành viên dùng Ollama local**, xem [cài đặt và cấu hình miễn phí](06_Ollama_Local.md).
 - Chạy app: `dotnet run --project DocuMind.WPF`.
@@ -12,4 +14,4 @@ Hướng dẫn hiện hành: [Sửa lỗi, dữ liệu và nghiệm thu](05_Fixe
 
 Hai tài liệu `01_Setup_va_Code` và `02_Luong_hoat_dong` (MD/DOCX), ảnh trong `assets`, cùng `Database_SQLServer.txt` mô tả phiên bản gốc `355df3d`. Sơ đồ/schema, vị trí DB và một số luồng trong đó đã thay đổi; giữ chúng làm tư liệu lịch sử. App hiện hành sử dụng SQLite, chưa chuyển sang SQL Server. Không chạy script SQL Server cũ để nâng cấp app.
 
-`docs/tools/DbCheck` hỗ trợ kiểm tra script SQLite cùng backup/restore ngoại tuyến; xem tài liệu 05. Công cụ build/verify Word chỉ dành cho bộ tài liệu lịch sử, chưa tái phát hành DOCX cho kiến trúc mới.
+`docs/tools/DbCheck` hỗ trợ kiểm tra script SQLite cùng backup/restore ngoại tuyến; xem tài liệu 07. `docs/tools/build_spec.py` sinh Word hiện hành từ Markdown 07 bằng python-docx; cần render và xem lại toàn bộ trang sau mỗi thay đổi. `build_docs.py` và `verify_docs.py` chỉ dành cho bộ tài liệu lịch sử 01 và 02.
