@@ -66,7 +66,7 @@ public class WorkspaceRegressionTests
             { SelectedWorkspace = (await repository.GetAllAsync()).Single() };
         await ProviderRegressionTests.WaitUntilAsync(() => !vm.IsLoading);
         await vm.IngestFilesAsync([fixture.File("first.txt"), fixture.File("failed.txt"), fixture.File("last.txt")]);
-        Assert.Contains("Thành công 2", vm.BusyStatus); Assert.Contains("Lỗi/hủy 1", vm.BusyStatus); Assert.Contains("failed.txt", vm.BusyStatus);
+        Assert.Contains("Completed 2", vm.BusyStatus); Assert.Contains("Failed or canceled 1", vm.BusyStatus); Assert.Contains("failed.txt", vm.BusyStatus);
         await using var db = fixture.CreateDbContext();
         Assert.Equal(2, await db.DocumentVersions.CountAsync(v => v.Status == DocumentVersionStatus.Ready));
         Assert.False(vm.IsBusy);
@@ -111,7 +111,7 @@ public class WorkspaceRegressionTests
         await ProviderRegressionTests.WaitUntilAsync(() => !vm.IsLoading);
         var ingest = vm.IngestFilesAsync([path]); await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
         vm.CancelCommand.Execute(null); await ingest;
-        Assert.False(vm.IsBusy); Assert.Contains("đã hủy", vm.BusyStatus);
+        Assert.False(vm.IsBusy); Assert.Contains("canceled or timed out", vm.BusyStatus);
         providers.Ai.Embed = (_, _) => Task.FromResult(new float[] { 1, 0 });
         Assert.Equal("old content", Assert.Single((await rag.ChatWithRagAsync(SqliteFixture.WorkspaceId, "system", "question")).Sources).Content);
     }

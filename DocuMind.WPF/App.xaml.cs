@@ -25,12 +25,12 @@ public partial class App : System.Windows.Application
     {
         var services = new ServiceCollection();
 
-        // 1. Database SQLite tự động lưu file cục bộ tại thư mục ứng dụng
+        // Local SQLite database.
         string dbPath = DatabaseMaintenance.DefaultPath;
         services.AddDbContextFactory<AppDbContext>(options =>
             options.UseSqlite(DatabaseMaintenance.ConnectionString(dbPath)));
 
-        // 2. HttpClient dùng chung
+        // Shared HttpClient.
         services.AddSingleton<HttpClient>();
 
         // 3. Infrastructure Repositories & Parsers
@@ -64,7 +64,7 @@ public partial class App : System.Windows.Application
         try
         {
             _instanceMutex = new Mutex(true, "Local\\DocuMind-" + Environment.UserName, out var ownsInstance);
-            if (!ownsInstance) { MessageBox.Show("DocuMind đang chạy trong một cửa sổ khác."); Shutdown(); return; }
+            if (!ownsInstance) { MessageBox.Show("DocuMind is already running in another window."); Shutdown(); return; }
             using (var scope = Services.CreateScope())
             {
                 var factory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>();
@@ -78,8 +78,8 @@ public partial class App : System.Windows.Application
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Lỗi khởi động ứng dụng: {UserErrors.Describe(ex)}\nDB/backup: {Path.GetDirectoryName(DatabaseMaintenance.DefaultPath)}",
-                "DocuMind - Lỗi Khởi Động", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show($"The application could not start: {UserErrors.Describe(ex)}\nDatabase and backups: {Path.GetDirectoryName(DatabaseMaintenance.DefaultPath)}",
+                "DocuMind — Startup error", MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown(1);
         }
     }

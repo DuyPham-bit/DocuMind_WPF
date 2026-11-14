@@ -11,7 +11,7 @@ public class ChatMessageDisplayModel
     public string Provider { get; set; } = "";
     public string Model { get; set; } = "";
     public double Temperature { get; set; }
-    public string SenderName => Role == MessageRole.User ? "Bạn" : "DocuMind AI";
+    public string SenderName => Role == MessageRole.User ? "You" : "DocuMind AI";
     public bool IsUser => Role == MessageRole.User;
     public string Content { get; set; } = string.Empty;
     public DateTime Timestamp { get; set; } = DateTime.Now;

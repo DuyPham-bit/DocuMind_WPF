@@ -103,7 +103,7 @@ public class RagRegressionTests
         providers.Temperature = .99;
         await rag.ChatWithRagAsync(SqliteFixture.WorkspaceId, "original system", "question", session: session);
         var request = Assert.Single(providers.Ai.Requests);
-        Assert.Contains("không tin cậy", request.System); Assert.DoesNotContain(malicious, request.System);
+        Assert.Contains("untrusted data", request.System); Assert.DoesNotContain(malicious, request.System);
         Assert.Contains("DOCUMENT_DATA_", request.User); Assert.Contains("evil.test", request.User); Assert.Equal(.23, request.Temperature);
         await rag.ChatExternalAsync("system", "direct", session: session);
         Assert.Equal(.23, providers.Ai.Requests.Last().Temperature);

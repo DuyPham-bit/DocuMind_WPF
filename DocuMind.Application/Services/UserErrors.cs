@@ -10,12 +10,12 @@ public static class UserErrors
         Trace.TraceError("DocuMind operation failed: {0}", error.GetType().Name);
         return error switch
         {
-            OperationCanceledException => "Thao tác đã hủy hoặc hết thời gian chờ. Dữ liệu đã lưu được giữ nguyên.",
-            HttpRequestException http when http.StatusCode != null => $"AI provider trả HTTP {(int)http.StatusCode}. Kiểm tra key/model hoặc thử lại sau.",
-            HttpRequestException => "Không thể kết nối provider. Kiểm tra mạng và Base URL.",
-            InvalidOperationException => "Thao tác không hợp lệ. Kiểm tra cấu hình provider chat/embedding, model và DPAPI CurrentUser; re-index nếu cần.",
-            IOException => "Không thể đọc/ghi tệp. Kiểm tra đường dẫn và quyền truy cập.",
-            _ => "Không thể hoàn tất thao tác. Dữ liệu đã lưu được giữ nguyên; hãy kiểm tra cấu hình rồi thử lại."
+            OperationCanceledException => "The operation was canceled or timed out. Existing saved data was kept.",
+            HttpRequestException http when http.StatusCode != null => $"The AI provider returned HTTP {(int)http.StatusCode}. Check the key or model, then try again.",
+            HttpRequestException => "Unable to reach the provider. Check your network connection and base URL.",
+            InvalidOperationException => "The operation cannot be completed. Check the chat or embedding provider, model, and DPAPI settings; re-index if needed.",
+            IOException => "Unable to read or write a file. Check the path and permissions.",
+            _ => "The operation could not be completed. Existing saved data was kept; check your settings and try again."
         };
     }
 }

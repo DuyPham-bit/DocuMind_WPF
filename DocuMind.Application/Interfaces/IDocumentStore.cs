@@ -5,7 +5,7 @@ namespace DocuMind.Application.Interfaces;
 
 public record DocumentListItem(Guid Id, string DisplayName, string SourcePath, bool NeedsReindex = false)
 {
-    public string Label => NeedsReindex ? DisplayName + " (cần re-index)" : DisplayName;
+    public string Label => NeedsReindex ? DisplayName + " (re-index required)" : DisplayName;
     public override string ToString() => Label;
 }
 

@@ -8,7 +8,7 @@ public class Workspace
     public Guid ConversationId { get; set; } = Guid.NewGuid();
     public string Name { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
-    public string SystemPrompt { get; set; } = "Bạn là trợ lý phân tích tài liệu và nghiên cứu thông tin chuyên nghiệp.";
+    public string SystemPrompt { get; set; } = "You are a professional assistant for document analysis and research.";
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public ICollection<DocumentChunk> Chunks { get; set; } = new List<DocumentChunk>();

@@ -28,24 +28,26 @@ public partial class MainViewModel : ObservableObject
     public ObservableCollection<ChatMessageDisplayModel> ChatMessages { get; } = new();
     public ObservableCollection<DocumentListItem> UploadedFiles { get; } = new();
     public ObservableCollection<PromptTemplate> PromptTemplates { get; } = new();
+    public bool IsChatEmpty => ChatMessages.Count == 0;
     [ObservableProperty] private Workspace? _selectedWorkspace;
     [ObservableProperty] private string _workspaceName = "";
     [ObservableProperty] private string _userInput = "";
-    [ObservableProperty] private string _systemPrompt = "Bạn là trợ lý học tập và nghiên cứu tài liệu chuẩn xác.";
+    [ObservableProperty] private string _systemPrompt = "You are a precise assistant for document research and learning.";
     [ObservableProperty] private bool _useRagMode = true;
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private bool _isLoading;
     [ObservableProperty] private string _busyStatus = "";
-    [ObservableProperty] private string _activeProviderInfo = "Chưa thiết lập Provider";
+    [ObservableProperty] private string _activeProviderInfo = "No provider configured";
     public bool CanWork => !IsBusy && !IsLoading;
     public Action? OpenSettingsAction { get; set; }
 
     public MainViewModel(RagOrchestratorService rag, IChatProviderFactory providers, IRepository<Workspace> workspaces, IChatHistoryStore history)
     {
         _rag = rag; _providers = providers; _workspaces = workspaces; _history = history;
-        PromptTemplates.Add(new("📌 Tóm tắt tài liệu", "Tóm tắt các ý chính", "Hãy tóm tắt các ý chính của tài liệu trong workspace."));
-        PromptTemplates.Add(new("❓ Câu hỏi ôn tập", "Tạo câu hỏi kiểm tra", "Tạo 5 câu hỏi ôn tập kèm đáp án dựa trên tài liệu."));
-        PromptTemplates.Add(new("💡 Giải thích khái niệm", "Làm rõ thuật ngữ", "Giải thích các khái niệm quan trọng trong tài liệu."));
+        ChatMessages.CollectionChanged += (_, _) => OnPropertyChanged(nameof(IsChatEmpty));
+        PromptTemplates.Add(new("Summarize", "Summarize key ideas", "Summarize the key ideas in the documents in this workspace."));
+        PromptTemplates.Add(new("Study questions", "Create a knowledge check", "Create five study questions with answers based on the uploaded documents."));
+        PromptTemplates.Add(new("Explain concepts", "Clarify key terms", "Explain the most important concepts in the uploaded documents."));
     }
 
     partial void OnIsBusyChanged(bool value) => RefreshCommands();
@@ -76,7 +78,7 @@ public partial class MainViewModel : ObservableObject
         try
         {
             var active = await _providers.GetActiveSettingAsync();
-            ActiveProviderInfo = active == null ? "Chưa cấu hình (Bấm Cài đặt)" : $"{active.ProviderType} ({active.ChatModel})";
+            ActiveProviderInfo = active == null ? "Not configured" : $"{active.ProviderType} · {active.ChatModel}";
         }
         catch (Exception ex) { ActiveProviderInfo = UserErrors.Describe(ex); }
     }
@@ -116,7 +118,7 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanWork))]
     private async Task UploadDocumentAsync()
     {
-        var dialog = new OpenFileDialog { Title = "Chọn tài liệu", Filter = "Tài liệu (*.pdf;*.txt;*.md)|*.pdf;*.txt;*.md|Tất cả (*.*)|*.*", Multiselect = true };
+        var dialog = new OpenFileDialog { Title = "Choose documents", Filter = "Documents (*.pdf;*.txt;*.md)|*.pdf;*.txt;*.md|All files (*.*)|*.*", Multiselect = true };
         if (SelectedWorkspace != null && dialog.ShowDialog() == true) await IngestFilesAsync(dialog.FileNames);
     }
 
@@ -134,13 +136,13 @@ public partial class MainViewModel : ObservableObject
             {
                 if (operation.IsCancellationRequested) break;
                 try { await _rag.IngestDocumentAsync(id, path, progress, operation.Token); success.Add(Path.GetFileName(path)); }
-                catch (OperationCanceledException) { failures.Add(Path.GetFileName(path) + ": đã hủy/hết thời gian"); break; }
+                catch (OperationCanceledException) { failures.Add(Path.GetFileName(path) + ": canceled or timed out"); break; }
                 catch (Exception ex) { failures.Add(Path.GetFileName(path) + ": " + UserErrors.Describe(ex)); }
             }
             var files = await _rag.GetWorkspaceFilesAsync(id);
             if (!Matches(id, conversation, generation)) return;
             UploadedFiles.Clear(); foreach (var file in files) UploadedFiles.Add(file);
-            BusyStatus = $"Thành công {success.Count}: {string.Join(", ", success)}. Lỗi/hủy {failures.Count}: {string.Join("; ", failures)}";
+            BusyStatus = $"Completed {success.Count}: {string.Join(", ", success)}. Failed or canceled {failures.Count}: {string.Join("; ", failures)}";
         }
         catch (Exception ex) { if (Matches(id, conversation, generation)) BusyStatus = UserErrors.Describe(ex); }
         finally { _operation = null; IsBusy = false; }
@@ -153,7 +155,7 @@ public partial class MainViewModel : ObservableObject
     {
         if (SelectedWorkspace == null || document == null) return;
         var id = SelectedWorkspace.Id; var conversation = SelectedWorkspace.ConversationId; var generation = _selectionGeneration;
-        if (MessageBox.Show($"Xóa '{document.DisplayName}' ({document.SourcePath}) cùng toàn bộ phiên bản index?", "Xóa tài liệu", MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
+        if (MessageBox.Show($"Remove '{document.DisplayName}' ({document.SourcePath}) and all of its index versions?", "Remove document", MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
         IsBusy = true;
         try
         {
@@ -170,7 +172,7 @@ public partial class MainViewModel : ObservableObject
         if (string.IsNullOrWhiteSpace(UserInput) || SelectedWorkspace == null || !CanWork) return;
         var id = SelectedWorkspace.Id; var conversation = SelectedWorkspace.ConversationId; var generation = _selectionGeneration;
         var question = UserInput.Trim(); var prompt = SystemPrompt; var mode = UseRagMode ? ChatMode.Rag : ChatMode.Direct;
-        UserInput = ""; IsBusy = true; BusyStatus = "Đang xử lý câu hỏi...";
+        UserInput = ""; IsBusy = true; BusyStatus = "Thinking…";
         using var operation = new CancellationTokenSource(TimeSpan.FromMinutes(2)); _operation = operation;
         try
         {
@@ -224,7 +226,7 @@ public partial class MainViewModel : ObservableObject
         IsBusy = true;
         try
         {
-            var workspace = new Workspace { Name = "Workspace mới", SystemPrompt = SystemPrompt };
+            var workspace = new Workspace { Name = "New workspace", SystemPrompt = SystemPrompt };
             await _workspaces.AddAsync(workspace); Workspaces.Add(workspace);
             if (generation == _selectionGeneration) SelectedWorkspace = workspace;
         }
@@ -256,8 +258,8 @@ public partial class MainViewModel : ObservableObject
     {
         if (SelectedWorkspace == null) return;
         var workspace = SelectedWorkspace;
-        if (MessageBox.Show($"Xóa workspace '{workspace.Name}'? Toàn bộ tài liệu, mọi phiên bản index và lịch sử chat trong workspace sẽ bị xóa vĩnh viễn.",
-            "Xác nhận cascade", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+        if (MessageBox.Show($"Delete workspace '{workspace.Name}'? Its documents, index versions, and chat history will be permanently removed.",
+            "Delete workspace", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
         IsBusy = true;
         try
         {
@@ -279,7 +281,7 @@ public partial class MainViewModel : ObservableObject
             text.AppendLine($"Mode: {message.Mode}; Provider: {message.Provider}; Model: {message.Model}; Temperature: {message.Temperature}\n");
             text.AppendLine(message.Content);
             foreach (var source in message.Sources)
-                text.AppendLine($"\n- Nguồn: {source.FileName}, trang {source.PageNumber}, score {source.Score:F3}, document {source.DocumentId}\n  {source.Content}");
+                text.AppendLine($"\n- Source: {source.FileName}, page {source.PageNumber}, score {source.Score:F3}, document {source.DocumentId}\n  {source.Content}");
             text.AppendLine("\n---\n");
         }
         return text.ToString();
@@ -292,7 +294,7 @@ public partial class MainViewModel : ObservableObject
     }
     [RelayCommand] private void OpenSource(RagSourceDto? source)
     {
-        if (source?.SourcePath == null || !File.Exists(source.SourcePath)) { BusyStatus = "Tệp nguồn không còn tồn tại trên máy."; return; }
+        if (source?.SourcePath == null || !File.Exists(source.SourcePath)) { BusyStatus = "The original source file is no longer available on this device."; return; }
         try
         {
             var uri = new Uri(Path.GetFullPath(source.SourcePath)).AbsoluteUri;

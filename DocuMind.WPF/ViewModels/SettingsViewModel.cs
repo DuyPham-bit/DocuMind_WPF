@@ -77,20 +77,20 @@ public partial class SettingsViewModel(IChatProviderFactory providerFactory) : O
         var generation = ++_generation;
         _operation?.Cancel();
         ApiKey = ""; ChatModel = ""; EmbeddingModel = ""; BaseUrl = ""; Temperature = 0.7; UseForEmbedding = false;
-        IsLoading = true; IsSuccessStatus = false; StatusMessage = "Đang tải cấu hình...";
+        IsLoading = true; IsSuccessStatus = false; StatusMessage = "Loading provider settings…";
         try
         {
             var draft = await providerFactory.LoadDraftAsync(provider);
             if (generation != _generation || provider != SelectedProvider) return;
             ApiKey = draft.ApiKey; ChatModel = draft.ChatModel; EmbeddingModel = draft.EmbeddingModel;
             BaseUrl = draft.BaseUrl; Temperature = draft.Temperature; UseForEmbedding = draft.UseForEmbedding;
-            StatusMessage = draft.KeyNeedsReplacement ? "Không thể giải mã key cũ bằng DPAPI CurrentUser. Hãy nhập lại key và Lưu; các trường cấu hình khác đã được giữ lại."
-                : provider == AiProviderType.OpenRouter ? "Dán API key OpenRouter, kiểm tra kết nối và embedding rồi Lưu cấu hình. Model miễn phí có giới hạn lượt gọi."
-                : "Cấu hình nháp. Kiểm tra không lưu cấu hình; chỉ Lưu mới kích hoạt provider chat.";
+            StatusMessage = draft.KeyNeedsReplacement ? "The stored key cannot be decrypted for this Windows user. Enter a replacement key and save; your other settings were preserved."
+                : provider == AiProviderType.OpenRouter ? "Paste an OpenRouter API key, test the connection and embeddings, then save. Free models have rate limits."
+                : "This is a draft. Tests do not save changes; saving activates the chat provider.";
         }
         catch (Exception ex)
         {
-            if (generation == _generation) StatusMessage = UserErrors.Describe(ex) + " Nếu key cũ không giải mã được, hãy nhập lại key và Lưu.";
+            if (generation == _generation) StatusMessage = UserErrors.Describe(ex) + " If the saved key cannot be decrypted, enter a replacement and save.";
         }
         finally { if (generation == _generation) IsLoading = false; }
     }
@@ -103,7 +103,7 @@ public partial class SettingsViewModel(IChatProviderFactory providerFactory) : O
     {
         var draft = CaptureDraft();
         var generation = _generation;
-        IsBusy = true; IsSuccessStatus = false; StatusMessage = "Đang kiểm tra cấu hình nháp...";
+        IsBusy = true; IsSuccessStatus = false; StatusMessage = "Testing the draft configuration…";
         using var operation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         _operation = operation;
         try
@@ -113,7 +113,7 @@ public partial class SettingsViewModel(IChatProviderFactory providerFactory) : O
                 : await providerFactory.CreateTemporary(draft).TestConnectionAsync(operation.Token);
             if (generation != _generation) return;
             IsSuccessStatus = ok;
-            StatusMessage = ok ? "Kết nối thành công. Cấu hình chưa được lưu." : "Không nhận được phản hồi hợp lệ. Cấu hình chưa được lưu.";
+            StatusMessage = ok ? "Connection successful. Your configuration has not been saved yet." : "No valid response was received. Your configuration has not been saved.";
         }
         catch (Exception ex) { if (generation == _generation) StatusMessage = UserErrors.Describe(ex); }
         finally { _operation = null; IsBusy = false; }
@@ -129,7 +129,7 @@ public partial class SettingsViewModel(IChatProviderFactory providerFactory) : O
         try
         {
             await providerFactory.SaveAsync(draft);
-            IsSuccessStatus = true; StatusMessage = "Đã lưu cấu hình.";
+            IsSuccessStatus = true; StatusMessage = "Provider settings saved.";
             CloseAction?.Invoke();
         }
         catch (Exception ex) { StatusMessage = UserErrors.Describe(ex); }
