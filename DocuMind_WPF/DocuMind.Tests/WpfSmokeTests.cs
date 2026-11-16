@@ -11,6 +11,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace DocuMind.Tests;
 
+[Collection("Language")] // toggles the process-wide EN / VI switch
 public class WpfSmokeTests
 {
     [Fact]

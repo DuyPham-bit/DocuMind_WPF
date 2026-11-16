@@ -1,5 +1,8 @@
+using System.IO;
+using System.Text.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using DocuMind.Application.Services;
 
 namespace DocuMind.WPF.Localization;
 
@@ -11,59 +14,55 @@ public sealed partial class UiText : ObservableObject
     public static UiText Current { get; } = new();
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(LanguageButtonLabel))]
-    [NotifyPropertyChangedFor(nameof(BrandSubtitle))]
-    [NotifyPropertyChangedFor(nameof(WorkspaceHeader))]
-    [NotifyPropertyChangedFor(nameof(WorkspaceSettingsHeader))]
-    [NotifyPropertyChangedFor(nameof(WorkspaceNameLabel))]
-    [NotifyPropertyChangedFor(nameof(SystemInstructionLabel))]
-    [NotifyPropertyChangedFor(nameof(NewButton))]
-    [NotifyPropertyChangedFor(nameof(SaveButton))]
-    [NotifyPropertyChangedFor(nameof(DeleteButton))]
-    [NotifyPropertyChangedFor(nameof(UploadDocumentsButton))]
-    [NotifyPropertyChangedFor(nameof(DocumentsHeader))]
-    [NotifyPropertyChangedFor(nameof(DocIndexedLabel))]
-    [NotifyPropertyChangedFor(nameof(DocPendingLabel))]
-    [NotifyPropertyChangedFor(nameof(RemoveDocTooltip))]
-    [NotifyPropertyChangedFor(nameof(AiProviderHeader))]
-    [NotifyPropertyChangedFor(nameof(ManageProvidersButton))]
-    [NotifyPropertyChangedFor(nameof(KnowledgeWorkspaceHeader))]
-    [NotifyPropertyChangedFor(nameof(SearchDocumentsLabel))]
-    [NotifyPropertyChangedFor(nameof(ExportButton))]
-    [NotifyPropertyChangedFor(nameof(NewChatButton))]
-    [NotifyPropertyChangedFor(nameof(EmptyTitle))]
-    [NotifyPropertyChangedFor(nameof(EmptySubtitle))]
-    [NotifyPropertyChangedFor(nameof(YouLabel))]
-    [NotifyPropertyChangedFor(nameof(AiAssistantLabel))]
-    [NotifyPropertyChangedFor(nameof(SourcesHeader))]
-    [NotifyPropertyChangedFor(nameof(OpenSourceButton))]
-    [NotifyPropertyChangedFor(nameof(CancelButton))]
-    [NotifyPropertyChangedFor(nameof(QuickStartHeader))]
-    [NotifyPropertyChangedFor(nameof(InputTooltip))]
-    [NotifyPropertyChangedFor(nameof(SendButton))]
-    [NotifyPropertyChangedFor(nameof(ComposerHint))]
-    [NotifyPropertyChangedFor(nameof(SettingsTitle))]
-    [NotifyPropertyChangedFor(nameof(SettingsSubtitle))]
-    [NotifyPropertyChangedFor(nameof(OpenRouterQuickTitle))]
-    [NotifyPropertyChangedFor(nameof(OpenRouterQuickDesc))]
-    [NotifyPropertyChangedFor(nameof(UseOpenRouterButton))]
-    [NotifyPropertyChangedFor(nameof(ProviderLabel))]
-    [NotifyPropertyChangedFor(nameof(ApiKeyLabel))]
-    [NotifyPropertyChangedFor(nameof(ApiKeyHint))]
-    [NotifyPropertyChangedFor(nameof(HoldToRevealButton))]
-    [NotifyPropertyChangedFor(nameof(ChatModelLabel))]
-    [NotifyPropertyChangedFor(nameof(TemperatureLabel))]
-    [NotifyPropertyChangedFor(nameof(EmbeddingModelLabel))]
-    [NotifyPropertyChangedFor(nameof(UseForEmbeddingLabel))]
-    [NotifyPropertyChangedFor(nameof(ReindexHint))]
-    [NotifyPropertyChangedFor(nameof(TestEmbeddingButton))]
-    [NotifyPropertyChangedFor(nameof(BaseUrlLabel))]
-    [NotifyPropertyChangedFor(nameof(TestConnectionButton))]
-    [NotifyPropertyChangedFor(nameof(SaveProviderButton))]
     private bool _isVietnamese;
+
+    private string? _settingsPath;
+
+    public static string DefaultSettingsPath => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DocuMind", "ui-settings.json");
 
     [RelayCommand]
     private void ToggleLanguage() => IsVietnamese = !IsVietnamese;
+
+    partial void OnIsVietnameseChanged(bool value)
+    {
+        AppText.Vietnamese = value;
+        // An empty property name tells WPF that every label changed, so new labels need no extra attribute.
+        OnPropertyChanged(string.Empty);
+        Save();
+    }
+
+    /// <summary>Loads the saved language and saves every later change. The app calls this once at startup;
+    /// tests leave it off so they never touch the real settings file.</summary>
+    public void EnablePersistence(string path)
+    {
+        _settingsPath = path;
+        try
+        {
+            if (!File.Exists(path)) return;
+            using var json = JsonDocument.Parse(File.ReadAllText(path));
+            if (json.RootElement.TryGetProperty("language", out var language))
+                IsVietnamese = language.GetString() == "vi";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        {
+            // A missing or damaged settings file only means the default language is used.
+        }
+    }
+
+    private void Save()
+    {
+        if (_settingsPath == null) return;
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(_settingsPath))!);
+            File.WriteAllText(_settingsPath, JsonSerializer.Serialize(new { language = IsVietnamese ? "vi" : "en" }));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Not being able to remember the language must never break the app.
+        }
+    }
 
     public string LanguageButtonLabel => IsVietnamese ? "VI / EN" : "EN / VI";
     public string BrandSubtitle => IsVietnamese ? "TRỢ LÝ TRI THỨC AI" : "KNOWLEDGE INTELLIGENCE";
