@@ -28,13 +28,16 @@ public partial class MainViewModel : ObservableObject
     public ObservableCollection<Workspace> Workspaces { get; } = new();
     public ObservableCollection<ChatMessageDisplayModel> ChatMessages { get; } = new();
     public ObservableCollection<DocumentListItem> UploadedFiles { get; } = new();
+    public ObservableCollection<ConversationSummary> Conversations { get; } = new();
     public ObservableCollection<PromptTemplate> PromptTemplates { get; } = new();
     public bool IsChatEmpty => ChatMessages.Count == 0;
+    public bool HasConversationActivity { get; private set; }
     [ObservableProperty] private Workspace? _selectedWorkspace;
     [ObservableProperty] private string _workspaceName = "";
     [ObservableProperty] private string _userInput = "";
     [ObservableProperty] private string _systemPrompt = "You are a precise assistant for document research and learning.";
     [ObservableProperty] private bool _useRagMode = true;
+    [ObservableProperty] private bool _isHistoryTabSelected;
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private bool _isLoading;
     [ObservableProperty] private string _busyStatus = "";
@@ -77,6 +80,7 @@ public partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(CanWork));
         UploadDocumentCommand.NotifyCanExecuteChanged(); DeleteDocumentCommand.NotifyCanExecuteChanged();
         SendMessageCommand.NotifyCanExecuteChanged(); ClearChatCommand.NotifyCanExecuteChanged();
+        OpenConversationCommand.NotifyCanExecuteChanged(); DeleteConversationCommand.NotifyCanExecuteChanged();
         CreateWorkspaceCommand.NotifyCanExecuteChanged(); SaveWorkspaceCommand.NotifyCanExecuteChanged(); DeleteWorkspaceCommand.NotifyCanExecuteChanged();
         OpenQuizCommand.NotifyCanExecuteChanged();
     }
@@ -144,7 +148,7 @@ public partial class MainViewModel : ObservableObject
         using var reload = new CancellationTokenSource();
         _reload = reload;
         var workspace = SelectedWorkspace;
-        ChatMessages.Clear(); UploadedFiles.Clear();
+        ChatMessages.Clear(); UploadedFiles.Clear(); Conversations.Clear();
         WorkspaceName = workspace?.Name ?? ""; SystemPrompt = workspace?.SystemPrompt ?? "";
         IsLoading = true;
         try
@@ -152,10 +156,12 @@ public partial class MainViewModel : ObservableObject
             if (workspace == null) return;
             var filesTask = _rag.GetWorkspaceFilesAsync(workspace.Id, reload.Token);
             var historyTask = _history.LoadForDisplayAsync(workspace.Id, workspace.ConversationId, ct: reload.Token);
-            await Task.WhenAll(filesTask, historyTask);
+            var conversationsTask = _history.ListConversationsAsync(workspace.Id, reload.Token);
+            await Task.WhenAll(filesTask, historyTask, conversationsTask);
             if (!Matches(workspace.Id, workspace.ConversationId, generation)) return;
             foreach (var file in await filesTask) UploadedFiles.Add(file);
             foreach (var message in await historyTask) ChatMessages.Add(ChatMessageDisplayModel.FromEntity(message));
+            foreach (var item in await conversationsTask) Conversations.Add(item);
         }
         catch (OperationCanceledException) { /* Superseded selection; no UI mutation. */ }
         catch (Exception ex) { if (generation == _selectionGeneration) BusyStatus = UserErrors.Describe(ex); }
@@ -246,9 +252,19 @@ public partial class MainViewModel : ObservableObject
             var assistant = Message(MessageRole.Assistant, result.ResponseText, result.Sources);
             if (assistant.Timestamp <= user.Timestamp) assistant.Timestamp = user.Timestamp.AddTicks(1);
             await _history.AppendAsync(user, assistant, operation.Token);
+            HasConversationActivity = true;
             pending = null;
-            if (Matches(id, conversation, generation)) ChatMessages.Add(ChatMessageDisplayModel.FromEntity(assistant));
-            if (Matches(id, conversation, generation)) BusyStatus = "";
+            if (Matches(id, conversation, generation))
+            {
+                ChatMessages.Add(ChatMessageDisplayModel.FromEntity(assistant));
+                BusyStatus = "";
+                var conversations = await _history.ListConversationsAsync(id, operation.Token);
+                if (Matches(id, conversation, generation))
+                {
+                    Conversations.Clear();
+                    foreach (var item in conversations) Conversations.Add(item);
+                }
+            }
 
             ChatMessage Message(MessageRole role, string text, List<RagSourceDto> sources) => new()
             {
@@ -271,6 +287,9 @@ public partial class MainViewModel : ObservableObject
 
     [RelayCommand] private void ApplyTemplate(PromptTemplate? template) { if (template != null) UserInput = template.Prompt; }
 
+    [RelayCommand] private void SelectDocumentsTab() => IsHistoryTabSelected = false;
+    [RelayCommand] private void SelectHistoryTab() => IsHistoryTabSelected = true;
+
     [RelayCommand(CanExecute = nameof(CanWork))]
     private async Task ClearChatAsync()
     {
@@ -282,6 +301,66 @@ public partial class MainViewModel : ObservableObject
         try { await _workspaces.UpdateAsync(workspace); if (SelectedWorkspace?.Id == workspace.Id) await ReloadSelectedWorkspaceAsync(); }
         catch (Exception ex) { workspace.ConversationId = previous; BusyStatus = UserErrors.Describe(ex); }
         finally { IsBusy = false; }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanWork))]
+    private async Task OpenConversationAsync(ConversationSummary? summary)
+    {
+        if (SelectedWorkspace == null || summary == null) return;
+        var workspace = SelectedWorkspace;
+        if (workspace.ConversationId == summary.ConversationId && ChatMessages.Count > 0) return;
+
+        var previous = workspace.ConversationId;
+        IsBusy = true;
+        workspace.ConversationId = summary.ConversationId;
+        try
+        {
+            await _workspaces.UpdateAsync(workspace);
+            if (SelectedWorkspace?.Id == workspace.Id) await ReloadSelectedWorkspaceAsync();
+        }
+        catch (Exception ex) { workspace.ConversationId = previous; BusyStatus = UserErrors.Describe(ex); }
+        finally { IsBusy = false; }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanWork))]
+    private async Task DeleteConversationAsync(ConversationSummary? summary)
+    {
+        if (SelectedWorkspace == null || summary == null) return;
+        var workspace = SelectedWorkspace;
+        IsBusy = true;
+        try
+        {
+            await _history.DeleteConversationAsync(workspace.Id, summary.ConversationId);
+            Conversations.Remove(summary);
+            if (workspace.ConversationId == summary.ConversationId)
+            {
+                workspace.ConversationId = Guid.NewGuid();
+                await _workspaces.UpdateAsync(workspace);
+                if (SelectedWorkspace?.Id == workspace.Id) await ReloadSelectedWorkspaceAsync();
+            }
+        }
+        catch (Exception ex) { BusyStatus = UserErrors.Describe(ex); }
+        finally { IsBusy = false; }
+    }
+
+    /// <summary>
+    /// Khi tắt ứng dụng, giữ lại toàn bộ tin nhắn cũ trong lịch sử và tạo ConversationId mới
+    /// để lần mở tiếp theo bắt đầu một cuộc trò chuyện mới sạch sẽ.
+    /// </summary>
+    public async Task StartNewConversationOnCloseAsync()
+    {
+        var targets = Workspaces.Count > 0
+            ? Workspaces.ToList()
+            : (SelectedWorkspace != null ? [SelectedWorkspace] : new List<Workspace>());
+
+        foreach (var workspace in targets)
+        {
+            var existing = await _history.LoadForDisplayAsync(workspace.Id, workspace.ConversationId, limit: 1);
+            if (existing.Count == 0) continue;
+
+            workspace.ConversationId = Guid.NewGuid();
+            await _workspaces.UpdateAsync(workspace);
+        }
     }
 
     [RelayCommand(CanExecute = nameof(CanWork))]

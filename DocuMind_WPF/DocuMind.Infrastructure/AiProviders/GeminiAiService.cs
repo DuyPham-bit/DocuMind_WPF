@@ -16,7 +16,7 @@ public sealed class GeminiAiService : IChatCompletionService, IEmbeddingService
 
     public const string DefaultEmbeddingModel = "gemini-embedding-001";
 
-    public GeminiAiService(HttpClient http, string apiKey, string model = "gemini-2.5-flash",
+    public GeminiAiService(HttpClient http, string apiKey, string model = "gemini-3.5-flash",
         string embeddingModel = DefaultEmbeddingModel, string baseUrl = "")
     {
         _http = http; _key = apiKey; _model = model;
@@ -59,12 +59,26 @@ public sealed class GeminiAiService : IChatCompletionService, IEmbeddingService
         contents.Add(new { role = "user", parts = new[] { new { text = userPrompt } } });
         var payload = new { system_instruction = new { parts = new[] { new { text = systemPrompt } } }, contents,
             generationConfig = new { temperature } };
-        using var response = await ProviderHttp.SendAsync(_http, () => Request(_model, "generateContent", payload), false, ct);
+        using var response = await SendChatWithFallbackAsync(payload, ct);
         using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
         var candidates = doc.RootElement.GetProperty("candidates");
         if (candidates.GetArrayLength() == 0 || !candidates[0].TryGetProperty("content", out var content)) return "";
         return string.Concat(content.GetProperty("parts").EnumerateArray()
             .Where(x => x.TryGetProperty("text", out _)).Select(x => x.GetProperty("text").GetString()));
+    }
+
+    // Google retires dated models (404). Fall back to aliases Google keeps pointing at a live model.
+    private static readonly string[] FallbackChatModels = ["gemini-3.5-flash", "gemini-flash-latest", "gemini-flash-lite-latest"];
+
+    private async Task<HttpResponseMessage> SendChatWithFallbackAsync(object payload, CancellationToken ct)
+    {
+        var models = new[] { _model }.Concat(FallbackChatModels)
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        for (var i = 0; ; i++)
+        {
+            try { return await ProviderHttp.SendAsync(_http, () => Request(models[i], "generateContent", payload), false, ct); }
+            catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound && i < models.Length - 1) { }
+        }
     }
 
     public async Task<float[]> GenerateEmbeddingAsync(string text, CancellationToken ct = default)

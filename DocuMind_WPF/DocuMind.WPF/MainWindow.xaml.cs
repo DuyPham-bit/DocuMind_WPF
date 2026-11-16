@@ -13,6 +13,7 @@ public partial class MainWindow : Window
 {
     private readonly MainViewModel _viewModel;
     private readonly IServiceProvider _serviceProvider;
+    private bool _closingArchiveCompleted;
 
     public MainWindow(MainViewModel viewModel, IServiceProvider serviceProvider)
     {
@@ -39,6 +40,22 @@ public partial class MainWindow : Window
         Loaded += async (s, e) =>
         {
             await _viewModel.InitializeAsync();
+        };
+
+        Closing += async (_, e) =>
+        {
+            if (_closingArchiveCompleted || (!_viewModel.HasConversationActivity && _viewModel.ChatMessages.Count == 0))
+            {
+                return;
+            }
+
+            e.Cancel = true;
+            try { await _viewModel.StartNewConversationOnCloseAsync(); }
+            finally
+            {
+                _closingArchiveCompleted = true;
+                Close();
+            }
         };
     }
 

@@ -75,6 +75,7 @@ public partial class App : System.Windows.Application
                 await using var db = await factory.CreateDbContextAsync();
                 await DatabaseMaintenance.InitializeAsync(db, DatabaseMaintenance.DefaultPath,
                     Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "documind_local.db"));
+                await DatabaseMaintenance.StartFreshConversationsAsync(db);
             }
 
             var mainWindow = Services.GetRequiredService<MainWindow>();

@@ -64,10 +64,10 @@
                 <Setter Property="BorderBrush" Value="#E3D7C3"/>
                 <Setter Property="BorderThickness" Value="1"/>
                 <Setter Property="CornerRadius" Value="16,16,16,4"/>
-                <Setter Property="Padding" Value="16,13"/>
-                <Setter Property="Margin" Value="8,6,90,6"/>
+                <Setter Property="Padding" Value="20,16"/>
+                <Setter Property="Margin" Value="8,8,48,8"/>
                 <Setter Property="HorizontalAlignment" Value="Left"/>
-                <Setter Property="MaxWidth" Value="780"/>
+                <Setter Property="MaxWidth" Value="860"/>
             </Style>
         </ResourceDictionary>
     </Window.Resources>
@@ -148,7 +148,7 @@
                     <Button Content="{Binding Source={x:Static loc:UiText.Current}, Path=UploadDocumentsButton}" Command="{Binding UploadDocumentCommand}" Style="{StaticResource PrimaryButton}" Margin="0,12,0,0"/>
                 </StackPanel>
 
-                <!-- Documents Vault -->
+                <!-- Documents & History Vault -->
                 <Grid Grid.Row="2" Margin="0,18,0,14">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -157,14 +157,62 @@
                     <Grid Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="{Binding Source={x:Static loc:UiText.Current}, Path=DocumentsHeader}" Style="{StaticResource HudLabel}" VerticalAlignment="Center"/>
-                        <Border Grid.Column="1" Background="#F5E9D3" BorderBrush="#DECBAE" BorderThickness="1" CornerRadius="10" Padding="9,2">
-                            <TextBlock Text="{Binding UploadedFiles.Count, StringFormat={}{0}}" FontSize="10.5" FontWeight="Bold" Foreground="#9A3412"/>
-                        </Border>
+                        <Button Grid.Column="0" Command="{Binding SelectDocumentsTabCommand}" Height="32" Padding="8,0" Cursor="Hand">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="TabBorder" Background="#FFFDF9" BorderBrush="#B45309" BorderThickness="1" CornerRadius="9" Padding="{TemplateBinding Padding}">
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Source={x:Static loc:UiText.Current}, Path=DocumentsHeader}" FontSize="10" FontWeight="Bold" Foreground="#9A3412" VerticalAlignment="Center"/>
+                                            <Border Background="#F5E9D3" CornerRadius="8" Padding="6,1" Margin="6,0,0,0">
+                                                <TextBlock Text="{Binding UploadedFiles.Count, StringFormat={}{0}}" FontSize="10" FontWeight="Bold" Foreground="#9A3412"/>
+                                            </Border>
+                                        </StackPanel>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <DataTrigger Binding="{Binding IsHistoryTabSelected}" Value="True">
+                                            <Setter TargetName="TabBorder" Property="Background" Value="#EFE5D2"/>
+                                            <Setter TargetName="TabBorder" Property="BorderBrush" Value="#DECBAE"/>
+                                        </DataTrigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <Button Grid.Column="2" Command="{Binding SelectHistoryTabCommand}" Height="32" Padding="8,0" Cursor="Hand">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="TabBorder" Background="#EFE5D2" BorderBrush="#DECBAE" BorderThickness="1" CornerRadius="9" Padding="{TemplateBinding Padding}">
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Source={x:Static loc:UiText.Current}, Path=HistoryHeader}" FontSize="10" FontWeight="Bold" Foreground="#5C4E3F" VerticalAlignment="Center"/>
+                                            <Border Background="#F5E9D3" CornerRadius="8" Padding="6,1" Margin="6,0,0,0">
+                                                <TextBlock Text="{Binding Conversations.Count, StringFormat={}{0}}" FontSize="10" FontWeight="Bold" Foreground="#9A3412"/>
+                                            </Border>
+                                        </StackPanel>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <DataTrigger Binding="{Binding IsHistoryTabSelected}" Value="True">
+                                            <Setter TargetName="TabBorder" Property="Background" Value="#FFFDF9"/>
+                                            <Setter TargetName="TabBorder" Property="BorderBrush" Value="#B45309"/>
+                                        </DataTrigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
                     </Grid>
-                    <Border Grid.Row="1" Style="{StaticResource GlassCard}" Background="#FFFDF9">
+
+                    <!-- Documents List -->
+                    <Border Grid.Row="1" Background="#FFFDF9">
+                        <Border.Style>
+                            <Style TargetType="Border" BasedOn="{StaticResource GlassCard}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsHistoryTabSelected}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
                         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="6">
                             <ItemsControl ItemsSource="{Binding UploadedFiles}">
                                 <ItemsControl.ItemTemplate>
@@ -211,6 +259,83 @@
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
                         </ScrollViewer>
+                    </Border>
+
+                    <!-- Saved Conversations History List -->
+                    <Border Grid.Row="1" Background="#FFFDF9" BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="14">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsHistoryTabSelected}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <Grid>
+                            <TextBlock Text="{Binding Source={x:Static loc:UiText.Current}, Path=NoHistoryText}"
+                                       FontSize="11.5" Foreground="{StaticResource InkMutedBrush}"
+                                       TextAlignment="Center" TextWrapping="Wrap"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" Margin="18">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Conversations.Count}" Value="0">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="6">
+                                <ItemsControl ItemsSource="{Binding Conversations}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="#FAF5EB" BorderBrush="#E6DAC5" BorderThickness="1" CornerRadius="10" Margin="2,3" Padding="8,7">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <Button Grid.Column="0"
+                                                            Command="{Binding DataContext.OpenConversationCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                            CommandParameter="{Binding}"
+                                                            Background="Transparent" BorderThickness="0"
+                                                            HorizontalContentAlignment="Stretch" Cursor="Hand">
+                                                        <Button.Template>
+                                                            <ControlTemplate TargetType="Button">
+                                                                <Border Background="Transparent" Padding="2,1">
+                                                                    <ContentPresenter/>
+                                                                </Border>
+                                                            </ControlTemplate>
+                                                        </Button.Template>
+                                                        <StackPanel>
+                                                            <TextBlock Text="{Binding Title}" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource InkPrimaryBrush}" TextTrimming="CharacterEllipsis"/>
+                                                            <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                                                                <TextBlock Text="{Binding LastMessageAt, StringFormat={}{0:dd/MM HH:mm}}" FontSize="9.5" Foreground="{StaticResource InkMutedBrush}"/>
+                                                                <TextBlock Text=" · " FontSize="9.5" Foreground="{StaticResource InkMutedBrush}"/>
+                                                                <TextBlock Text="{Binding MessageCount}" FontSize="9.5" FontWeight="SemiBold" Foreground="#9A4A18"/>
+                                                                <TextBlock Text=" " FontSize="9.5"/>
+                                                                <TextBlock Text="{Binding Source={x:Static loc:UiText.Current}, Path=MessagesSuffix}" FontSize="9.5" Foreground="{StaticResource InkMutedBrush}"/>
+                                                            </StackPanel>
+                                                        </StackPanel>
+                                                    </Button>
+                                                    <Button Grid.Column="1" Content="×"
+                                                            Command="{Binding DataContext.DeleteConversationCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                            CommandParameter="{Binding}"
+                                                            ToolTip="{Binding Source={x:Static loc:UiText.Current}, Path=DeleteHistoryTooltip}"
+                                                            Width="24" Height="24" Padding="0" Margin="6,0,0,0"
+                                                            Background="Transparent" BorderThickness="0"
+                                                            Foreground="#7B6A56" FontSize="17" Cursor="Hand"/>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </Grid>
                     </Border>
                 </Grid>
 
@@ -417,30 +542,6 @@
             <!-- Command Prompt Composer -->
             <Border Grid.Row="2" Background="#FFFDF8" BorderBrush="#E5DAC6" BorderThickness="0,1,0,0" Padding="24,14,24,16">
                 <StackPanel>
-                    <Grid Margin="0,0,0,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="{Binding Source={x:Static loc:UiText.Current}, Path=QuickStartHeader}" Style="{StaticResource HudLabel}" VerticalAlignment="Top" Margin="0,8,12,0"/>
-                        <ItemsControl Grid.Column="1" ItemsSource="{Binding PromptTemplates}">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <WrapPanel Orientation="Horizontal"/>
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Button Content="{Binding Title}"
-                                            ToolTip="{Binding Description}"
-                                            Command="{Binding DataContext.ApplyTemplateCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                            CommandParameter="{Binding}"
-                                            Style="{StaticResource ChipButton}"/>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </Grid>
-
                     <Border Background="#FAF6EE" BorderBrush="#DECBAE" BorderThickness="1" CornerRadius="14" Padding="8">
                         <Grid>
                             <Grid.ColumnDefinitions>

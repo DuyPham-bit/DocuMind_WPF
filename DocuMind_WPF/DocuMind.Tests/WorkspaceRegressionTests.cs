@@ -185,6 +185,50 @@ public class WorkspaceRegressionTests
     }
 
     [Fact]
+    public async Task ClosingAppArchivesActiveConversationAndStartsNewConversationOnReopen()
+    {
+        using var fixture = new SqliteFixture();
+        var repository = new EfRepository<Workspace>(fixture);
+        var store = new EfDocumentStore(fixture);
+        var history = new EfChatHistoryStore(fixture);
+        var providers = new FakeProviders();
+
+        var vm = new MainViewModel(new(providers, new FakeParser(), store), providers, repository, history);
+        await vm.InitializeAsync();
+        await ProviderRegressionTests.WaitUntilAsync(() => !vm.IsLoading);
+
+        var initialConversation = vm.SelectedWorkspace!.ConversationId;
+        await history.AppendAsync(
+            new() { WorkspaceId = vm.SelectedWorkspace.Id, ConversationId = initialConversation, Content = "Câu hỏi trước khi tắt", Timestamp = DateTime.UtcNow },
+            new() { WorkspaceId = vm.SelectedWorkspace.Id, ConversationId = initialConversation, Role = MessageRole.Assistant, Content = "Trả lời trước khi tắt", Timestamp = DateTime.UtcNow.AddSeconds(1) });
+
+        // Simulate app close -> archive current conversation and rotate to a new ConversationId
+        await vm.StartNewConversationOnCloseAsync();
+        Assert.NotEqual(initialConversation, vm.SelectedWorkspace.ConversationId);
+
+        // Calling close-archive when the new conversation is empty keeps the empty ConversationId
+        var freshId = vm.SelectedWorkspace.ConversationId;
+        await vm.StartNewConversationOnCloseAsync();
+        Assert.Equal(freshId, vm.SelectedWorkspace.ConversationId);
+
+        // Simulate reopening the app with a fresh MainViewModel
+        var reopened = new MainViewModel(new(providers, new FakeParser(), store), providers, repository, history);
+        await reopened.InitializeAsync();
+        await ProviderRegressionTests.WaitUntilAsync(() => !reopened.IsLoading);
+
+        Assert.Empty(reopened.ChatMessages);
+        var archived = Assert.Single(reopened.Conversations);
+        Assert.Equal(initialConversation, archived.ConversationId);
+        Assert.Equal(2, archived.MessageCount);
+        Assert.Contains("Câu hỏi trước khi tắt", archived.Title);
+
+        // Selecting the saved conversation restores its messages
+        await reopened.OpenConversationCommand.ExecuteAsync(archived);
+        await ProviderRegressionTests.WaitUntilAsync(() => !reopened.IsLoading);
+        Assert.Equal(new[] { "Câu hỏi trước khi tắt", "Trả lời trước khi tắt" }, reopened.ChatMessages.Select(m => m.Content));
+    }
+
+    [Fact]
     public async Task SavingANewEmbeddingProviderReindexesDocumentsBuiltWithTheOldOne()
     {
         using var fixture = new SqliteFixture(); var repository = new EfRepository<Workspace>(fixture);

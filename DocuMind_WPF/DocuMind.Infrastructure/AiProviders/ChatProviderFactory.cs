@@ -121,7 +121,7 @@ public sealed class ChatProviderFactory(IDbContextFactory<AppDbContext> contexts
 
     public static ProviderConfigDraft Defaults(AiProviderType provider) => provider switch
     {
-        AiProviderType.Gemini => new(provider, "", "gemini-2.5-flash", GeminiAiService.DefaultEmbeddingModel, UseForEmbedding: true),
+        AiProviderType.Gemini => new(provider, "", "gemini-3.5-flash", GeminiAiService.DefaultEmbeddingModel, UseForEmbedding: true),
         AiProviderType.OpenAI => new(provider, "", "gpt-4o-mini", "text-embedding-3-small", UseForEmbedding: true),
         AiProviderType.Groq => new(provider, "", "llama-3.3-70b-versatile"),
         AiProviderType.OllamaLocal => new(provider, "", "llama3"),

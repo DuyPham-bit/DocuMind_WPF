@@ -75,6 +75,10 @@ public sealed partial class UiText : ObservableObject
     public string DeleteButton => IsVietnamese ? "Xóa" : "Delete";
     public string UploadDocumentsButton => IsVietnamese ? "＋  Nạp tài liệu" : "＋  Upload documents";
     public string DocumentsHeader => IsVietnamese ? "TÀI LIỆU" : "DOCUMENTS";
+    public string HistoryHeader => IsVietnamese ? "LỊCH SỬ" : "HISTORY";
+    public string NoHistoryText => IsVietnamese ? "Chưa có cuộc trò chuyện nào được lưu." : "No saved conversations yet.";
+    public string DeleteHistoryTooltip => IsVietnamese ? "Xóa cuộc trò chuyện" : "Delete conversation";
+    public string MessagesSuffix => IsVietnamese ? "tin" : "msgs";
     public string DocIndexedLabel => IsVietnamese ? "Đã nạp · Sẵn sàng" : "Indexed · Ready";
     public string DocPendingLabel => IsVietnamese ? "Chờ nạp lại" : "Pending · Re-index";
     public string RemoveDocTooltip => IsVietnamese ? "Xóa tài liệu" : "Remove document";

@@ -81,4 +81,23 @@ public static class DatabaseMaintenance
 
     private static Task<int> RecoverStagingAsync(AppDbContext db) => db.DocumentVersions.Where(v => v.Status == DocumentVersionStatus.Staging)
         .ExecuteUpdateAsync(s => s.SetProperty(v => v.Status, DocumentVersionStatus.Failed));
+
+    public static async Task<int> StartFreshConversationsAsync(AppDbContext db, CancellationToken ct = default)
+    {
+        var workspaces = await db.Workspaces
+            .Where(w => db.ChatMessages.Any(m => m.WorkspaceId == w.Id && m.ConversationId == w.ConversationId))
+            .ToListAsync(ct);
+
+        foreach (var workspace in workspaces)
+        {
+            workspace.ConversationId = Guid.NewGuid();
+        }
+
+        if (workspaces.Count > 0)
+        {
+            await db.SaveChangesAsync(ct);
+        }
+
+        return workspaces.Count;
+    }
 }
