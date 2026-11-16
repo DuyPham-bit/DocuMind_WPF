@@ -71,7 +71,7 @@ dotnet test DocuMind.slnx --no-build
 dotnet run --project DocuMind.WPF
 ```
 
-Kết quả mong đợi: build 0 warning, 0 error; toàn bộ test pass (118 test tại thời điểm viết, ngày 17/11/2026). Test dùng AI/HTTP giả và SQLite tạm nên không cần API key và không gọi API thật.
+Kết quả mong đợi: build 0 warning, 0 error; toàn bộ test pass (126 test tại thời điểm viết, ngày 17/11/2026). Test dùng AI/HTTP giả và SQLite tạm nên không cần API key và không gọi API thật.
 
 ### 3.3 Dữ liệu nằm ở đâu
 
@@ -131,7 +131,7 @@ Base URL kết thúc ở `/v1` (Gemini là `/v1beta`), không thêm `/chat/compl
 Nút **EN / VI** đổi toàn bộ giao diện chính giữa tiếng Anh và tiếng Việt. Bên dưới ghi tên nút tiếng Anh, tên tiếng Việt trong ngoặc.
 
 1. **Workspace (mỗi môn một workspace):** chọn ở dropdown **WORKSPACE**; mở **Workspace settings** để sửa **NAME**, **SYSTEM INSTRUCTION** rồi **Save**, hoặc **New** / **Delete**. Xóa workspace sẽ xóa luôn tài liệu, index, lịch sử chat và lịch sử quiz của workspace đó (có hộp xác nhận).
-2. **Nạp tài liệu:** **＋ Upload documents** (*Nạp tài liệu*), chọn một hoặc nhiều file `.pdf`, `.txt`, `.md`. Trạng thái hiện tiến độ từng đoạn; bấm **Cancel** để dừng. Nạp lại cùng file chỉ thay bản cũ khi bản mới hoàn tất, lỗi giữa chừng thì bản cũ vẫn dùng được. PDF scan dạng ảnh cần OCR trước.
+2. **Nạp tài liệu:** **＋ Upload documents** (*Nạp tài liệu*), chọn một hoặc nhiều file `.pdf`, `.txt`, `.md`. Trạng thái hiện tiến độ theo lô (ví dụ "Creating embeddings 1–50/120…"); bấm **Cancel** để dừng. Nạp lại cùng file chỉ thay bản cũ khi bản mới hoàn tất, lỗi giữa chừng thì bản cũ vẫn dùng được. PDF scan dạng ảnh cần OCR trước.
    - Nhãn dưới tên file: **Indexed · Ready** (*Đã nạp · Sẵn sàng*) là dùng được; **Indexing…** là đang nạp; **Index failed · Retry ↻** (*Nạp lỗi · Thử lại*) là lần nạp bị lỗi hoặc bị hủy; **Embedding changed · Re-index ↻** là file được nạp bằng model embedding khác.
    - Hai nhãn có ↻ bấm được: app nạp lại file từ đường dẫn gốc. Nếu file đã bị di chuyển hoặc xóa, app báo và bạn dùng **Upload documents** để chọn lại.
 3. **Chat ra ngoài:** tắt **Search documents** (*Tra cứu tài liệu (RAG)*), gõ câu hỏi, **Enter** để gửi, **Shift + Enter** để xuống dòng. Câu hỏi đi kèm system instruction và các lượt chat gần nhất cùng chế độ.
@@ -220,7 +220,7 @@ XAML chỉ binding: `Text="{Binding Topic, UpdateSourceTrigger=PropertyChanged}"
 
 ### 7.3 Nạp tài liệu (ingest)
 
-`RagOrchestratorService.IngestDocumentAsync`: `BeginAsync` tạo version **Staging** → copy file sang bản tạm, tính SHA-256 → `IDocumentParser` tách theo trang → `VectorMathHelper.ChunkText` (180 từ, chồng 30 từ) → gọi embedding từng đoạn, kiểm tra vector hợp lệ và cùng số chiều → `ActivateAsync` ghi chunk + `EmbeddingProfile` và thay bản **Ready** cũ trong một transaction ngắn. Lỗi ở bất kỳ bước nào thì `FailAsync`, bản Ready cũ giữ nguyên. Embedding thử lại tối đa 3 lần với lỗi 408/429/5xx, không thử lại với 401/403. Giới hạn 10 phút mỗi file.
+`RagOrchestratorService.IngestDocumentAsync`: `BeginAsync` tạo version **Staging** → copy file sang bản tạm, tính SHA-256 → `IDocumentParser` tách theo trang → `VectorMathHelper.ChunkText` (180 từ, chồng 30 từ) → gọi embedding **theo lô** (`IEmbeddingService.GenerateEmbeddingsAsync`: Gemini `batchEmbedContents` tối đa 50 đoạn/request, OpenAI/OpenRouter/Ollama `input` mảng tối đa 32 đoạn; endpoint không nhận mảng thì tự quay về từng đoạn), kiểm tra số vector, vector hợp lệ và cùng số chiều → `ActivateAsync` ghi chunk + `EmbeddingProfile` và thay bản **Ready** cũ trong một transaction ngắn. Lỗi ở bất kỳ bước nào thì `FailAsync`, bản Ready cũ giữ nguyên. Embedding thử lại tối đa 3 lần với lỗi 408/429/5xx, không thử lại với 401/403. Giới hạn 10 phút mỗi file.
 
 ### 7.4 Chat RAG
 

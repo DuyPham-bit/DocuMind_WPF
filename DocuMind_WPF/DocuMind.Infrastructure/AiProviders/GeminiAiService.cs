@@ -90,6 +90,27 @@ public sealed class GeminiAiService : IChatCompletionService, IEmbeddingService
         return doc.RootElement.GetProperty("embedding").GetProperty("values").EnumerateArray().Select(x => x.GetSingle()).ToArray();
     }
 
+    /// <summary>Gemini batchEmbedContents nhận tối đa 100 request; dùng 50 để payload nhỏ và an toàn với quota.</summary>
+    public int MaxBatchSize => 50;
+
+    public async Task<IReadOnlyList<float[]>> GenerateEmbeddingsAsync(IReadOnlyList<string> texts, CancellationToken ct = default)
+    {
+        if (!SupportsEmbeddings) throw new InvalidOperationException("Chưa chọn model embedding.");
+        if (texts.Count == 0) return [];
+        if (texts.Count == 1) return [await GenerateEmbeddingAsync(texts[0], ct)];
+        var payload = new
+        {
+            requests = texts.Select(text => new { model = $"models/{_embeddingModel}", content = new { parts = new[] { new { text } } } }).ToArray()
+        };
+        using var response = await ProviderHttp.SendAsync(_http, () => Request(_embeddingModel, "batchEmbedContents", payload), true, ct);
+        using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+        var vectors = doc.RootElement.GetProperty("embeddings").EnumerateArray()
+            .Select(e => e.GetProperty("values").EnumerateArray().Select(x => x.GetSingle()).ToArray()).ToList();
+        if (vectors.Count != texts.Count)
+            throw new InvalidOperationException("The embedding batch returned a different number of vectors. The previous index was preserved.");
+        return vectors; // Gemini trả embeddings theo đúng thứ tự requests.
+    }
+
     public async Task<bool> TestConnectionAsync(CancellationToken ct = default) =>
         !string.IsNullOrWhiteSpace(await GenerateResponseAsync("You are a test assistant.", "Ping", 0.1, ct));
 }

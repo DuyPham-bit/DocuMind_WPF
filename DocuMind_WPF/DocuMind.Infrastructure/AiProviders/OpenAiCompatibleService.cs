@@ -67,6 +67,40 @@ public sealed class OpenAiCompatibleService : IChatCompletionService, IEmbedding
         return data.GetArrayLength() == 0 ? [] : data[0].GetProperty("embedding").EnumerateArray().Select(x => x.GetSingle()).ToArray();
     }
 
+    /// <summary>OpenAI, OpenRouter và Ollama (/v1/embeddings) đều nhận "input" là mảng chuỗi.</summary>
+    public int MaxBatchSize => 32;
+
+    public async Task<IReadOnlyList<float[]>> GenerateEmbeddingsAsync(IReadOnlyList<string> texts, CancellationToken ct = default)
+    {
+        if (!SupportsEmbeddings) throw new InvalidOperationException("Provider chỉ hỗ trợ chat. Hãy chọn provider embedding độc lập.");
+        if (texts.Count == 0) return [];
+        if (texts.Count == 1) return [await GenerateEmbeddingAsync(texts[0], ct)];
+        HttpResponseMessage response;
+        try
+        {
+            response = await ProviderHttp.SendAsync(_http,
+                () => Request("embeddings", new { model = _embeddingModel, input = texts.ToArray() }), true, ct);
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode is System.Net.HttpStatusCode.BadRequest or System.Net.HttpStatusCode.NotFound
+                                               or System.Net.HttpStatusCode.RequestEntityTooLarge or System.Net.HttpStatusCode.UnprocessableEntity)
+        {
+            // Một số endpoint "tương thích OpenAI" không nhận input dạng mảng: quay về gọi từng đoạn như trước.
+            var single = new List<float[]>(texts.Count);
+            foreach (var text in texts) single.Add(await GenerateEmbeddingAsync(text, ct));
+            return single;
+        }
+        using (response)
+        {
+            using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+            var items = doc.RootElement.GetProperty("data").EnumerateArray().Select((item, position) => (
+                Index: item.TryGetProperty("index", out var index) && index.TryGetInt32(out var i) ? i : position,
+                Vector: item.GetProperty("embedding").EnumerateArray().Select(x => x.GetSingle()).ToArray())).ToList();
+            if (items.Count != texts.Count || items.Select(x => x.Index).Distinct().Count() != texts.Count || items.Any(x => x.Index < 0 || x.Index >= texts.Count))
+                throw new InvalidOperationException("The embedding batch returned a different number of vectors. The previous index was preserved.");
+            return items.OrderBy(x => x.Index).Select(x => x.Vector).ToList(); // "index" chỉ vị trí của input, không bảo đảm thứ tự trả về.
+        }
+    }
+
     public async Task<bool> TestConnectionAsync(CancellationToken ct = default) =>
         !string.IsNullOrWhiteSpace(await GenerateResponseAsync("You are a test assistant.", "Ping", 0.1, ct));
 }

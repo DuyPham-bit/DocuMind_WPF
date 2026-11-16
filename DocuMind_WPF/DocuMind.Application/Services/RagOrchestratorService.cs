@@ -43,18 +43,31 @@ public sealed class RagOrchestratorService(IChatProviderFactory providers, IDocu
                 pages = await parser.ParseFileAsync(snapshot, ct);
             }
             finally { if (File.Exists(snapshot)) File.Delete(snapshot); }
-            var chunks = new List<DocumentChunk>();
+            var parts = pages.SelectMany(p => VectorMathHelper.ChunkText(p.Text).Select(text => (Page: p.PageNumber, Text: text))).ToList();
+            var chunks = new List<DocumentChunk>(parts.Count);
             var dimension = 0;
-            foreach (var (page, text) in pages)
-            foreach (var part in VectorMathHelper.ChunkText(text))
+            // Gửi theo lô để giảm số request (trước đây mỗi đoạn 180 từ là một request tuần tự).
+            // Vector của từng đoạn không đổi nên không cần đổi PipelineVersion hay nạp lại index cũ.
+            var batchSize = Math.Max(1, embedding.Service.MaxBatchSize);
+            for (var start = 0; start < parts.Count; start += batchSize)
             {
                 ct.ThrowIfCancellationRequested();
-                progress?.Report(AppText.T($"Creating embedding {chunks.Count + 1} (page {page})…", $"Đang tạo embedding {chunks.Count + 1} (trang {page})…"));
-                var vector = await embedding.Service.GenerateEmbeddingAsync(part, ct);
-                if (!VectorMathHelper.IsValidVector(vector) || (dimension != 0 && dimension != vector.Length))
-                    throw new InvalidOperationException("The embedding is empty, non-finite, or has an inconsistent dimension. The previous index was preserved.");
-                dimension = vector.Length;
-                chunks.Add(new DocumentChunk { ChunkIndex = chunks.Count, PageNumber = page, Content = part, EmbeddingJson = JsonSerializer.Serialize(vector) });
+                var batch = parts.Skip(start).Take(batchSize).ToList();
+                var last = start + batch.Count;
+                progress?.Report(batch.Count == 1
+                    ? AppText.T($"Creating embedding {last}/{parts.Count} (page {batch[0].Page})…", $"Đang tạo embedding {last}/{parts.Count} (trang {batch[0].Page})…")
+                    : AppText.T($"Creating embeddings {start + 1}–{last}/{parts.Count}…", $"Đang tạo embedding {start + 1}–{last}/{parts.Count}…"));
+                var vectors = await embedding.Service.GenerateEmbeddingsAsync(batch.Select(b => b.Text).ToList(), ct);
+                if (vectors.Count != batch.Count)
+                    throw new InvalidOperationException("The embedding batch returned a different number of vectors. The previous index was preserved.");
+                for (var i = 0; i < batch.Count; i++)
+                {
+                    var vector = vectors[i];
+                    if (!VectorMathHelper.IsValidVector(vector) || (dimension != 0 && dimension != vector.Length))
+                        throw new InvalidOperationException("The embedding is empty, non-finite, or has an inconsistent dimension. The previous index was preserved.");
+                    dimension = vector.Length;
+                    chunks.Add(new DocumentChunk { ChunkIndex = chunks.Count, PageNumber = batch[i].Page, Content = batch[i].Text, EmbeddingJson = JsonSerializer.Serialize(vector) });
+                }
             }
             if (chunks.Count == 0) throw new InvalidOperationException("No text could be extracted. The previous index was preserved.");
             ct.ThrowIfCancellationRequested();
