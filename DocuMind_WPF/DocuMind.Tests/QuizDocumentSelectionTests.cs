@@ -50,7 +50,7 @@ public class QuizDocumentSelectionTests
         Assert.Contains("selected-marker-beta", request.User);
         Assert.DoesNotContain("excluded-marker", request.User);
         Assert.Contains(draft.Questions.Single().Source!.DocumentId!.Value, selectedIds);
-        if (topic.Length == 0) Assert.Equal("Tài liệu đã chọn", draft.Topic);
+        if (topic.Length == 0) Assert.Equal(AppText.T("Selected documents", "Tài liệu đã chọn"), draft.Topic);
     }
 
     [Fact]
@@ -65,7 +65,7 @@ public class QuizDocumentSelectionTests
 
         var error = await Assert.ThrowsAsync<QuizUnavailableException>(() => quiz.GenerateAsync(SqliteFixture.WorkspaceId, "", 3, documentIds: []));
 
-        Assert.Contains("chọn ít nhất", error.Message);
+        Assert.Contains(AppText.T("at least one document", "chọn ít nhất"), error.Message);
         Assert.Empty(providers.Ai.Requests);
     }
 
@@ -144,7 +144,7 @@ public class QuizDocumentSelectionTests
         var vm = new QuizViewModel(new QuizService(rag, providers, new EfQuizStore(fixture)));
         await vm.InitializeAsync(SqliteFixture.WorkspaceId, "WS");
         Assert.False(vm.GenerateCommand.CanExecute(null));
-        Assert.Contains("chưa có tài liệu", vm.DocumentSelectionSummary);
+        Assert.Contains(AppText.T("no documents yet", "chưa có tài liệu"), vm.DocumentSelectionSummary);
         await rag.IngestDocumentAsync(SqliteFixture.WorkspaceId, fixture.File());
         providers.EmbeddingModel = "new-model";
         await vm.InitializeAsync(SqliteFixture.WorkspaceId, "WS");

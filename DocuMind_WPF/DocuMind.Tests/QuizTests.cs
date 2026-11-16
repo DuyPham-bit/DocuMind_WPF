@@ -103,7 +103,7 @@ public class QuizTests
         providers.Ai.Embed = (text, _) => Task.FromResult(text.StartsWith("tổng quan") ? new float[] { 0, 1 } : new float[] { 1, 0 }); // probe không khớp ngưỡng
         providers.Ai.Respond = _ => Task.FromResult(ValidJson);
         var draft = await new QuizService(rag, providers, new EfQuizStore(fixture)).GenerateAsync(SqliteFixture.WorkspaceId, "  ", 3);
-        Assert.Equal("Toàn bộ tài liệu", draft.Topic);
+        Assert.Equal(AppText.T("All documents", "Toàn bộ tài liệu"), draft.Topic);
         Assert.Contains("old content", Assert.Single(providers.Ai.Requests).User);
     }
 
@@ -166,7 +166,7 @@ public class QuizTests
         second.Options[secondWrong].IsSelected = true;                  // sai
 
         await vm.SubmitCommand.ExecuteAsync(null);
-        Assert.StartsWith("Điểm: 1/2", vm.ScoreText);
+        Assert.StartsWith(AppText.T("Score: 1/2", "Điểm: 1/2"), vm.ScoreText);
         Assert.True(second.Options[second.Question.AnswerIndex].IsCorrectAnswer);
         Assert.True(second.Options[secondWrong].IsWrongChoice);
         Assert.Equal("Theo scope", second.Options[second.Question.AnswerIndex].Text);
