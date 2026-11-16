@@ -132,7 +132,7 @@ Mở PowerShell và chạy lần lượt các lệnh sau:
 
 ```powershell
 # Bước 1: Di chuyển vào thư mục ASM2
-cd d:\CN5.1\PRN212\26.FA.PRN212\Project-Prn212\ASM2
+cd ASM2   # từ thư mục gốc của repo
 
 # Bước 2: Khôi phục packages & build kiểm tra lỗi biên dịch
 dotnet restore

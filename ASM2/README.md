@@ -7,7 +7,7 @@ Dự án mẫu minh họa **Dependency Injection (DI)**, **Constructor Injection
 ## Chạy nhanh
 
 ```powershell
-cd d:\CN5.1\PRN212\26.FA.PRN212\Project-Prn212\ASM2
+cd ASM2   # từ thư mục gốc của repo
 dotnet test
 dotnet run --project DependencyInjectionMvcDemo
 ```

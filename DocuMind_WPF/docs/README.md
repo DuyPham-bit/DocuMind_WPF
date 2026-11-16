@@ -1,6 +1,6 @@
 # DocuMind — tài liệu vận hành
 
-**User guide chính (setup, sử dụng, giải thích code): [10_Huong_dan_Setup_va_Code.md](10_Huong_dan_Setup_va_Code.md).**
+**User guide chính (setup, sử dụng, giải thích code): [USER_GUIDE.md](../USER_GUIDE.md).**
 
 Tài liệu hiện hành ngày 14/11/2026: [Đặc tả đầy đủ dự án Word](07_Dac_ta_du_an.docx), [nguồn Markdown](07_Dac_ta_du_an.md) và [review cuối cùng](08_Review_cuoi.md). Đặc tả bao gồm kiến trúc, dữ liệu, toàn bộ luồng, vận hành và giới hạn. Đợt review sửa lỗi thông báo bị ẩn sau thao tác và đồng bộ SQLite script với migration mới nhất; 68 test pass.
 
