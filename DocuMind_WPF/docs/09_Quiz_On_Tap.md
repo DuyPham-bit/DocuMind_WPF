@@ -5,7 +5,7 @@ Tính năng chủ đề học tập của DocuMind: AI soạn câu trắc nghi�
 ## Cách dùng
 
 1. Cấu hình provider có chat **và** embedding (ví dụ OpenRouter hoặc Ollama local, xem [06_Ollama_Local.md](06_Ollama_Local.md)), rồi nạp tài liệu vào workspace.
-2. Bấm **Quiz ôn tập** (giao diện tiếng Anh: **Study quiz**) trên thanh trên cùng của cửa sổ chính.
+2. Bấm **Quiz ôn tập** (giao diện tiếng Anh: **Study quiz**) trên thanh trên cùng của cửa sổ chính. Cửa sổ Quiz dùng cùng ngôn ngữ EN / VI với cửa sổ chính; các tên nút bên dưới là bản tiếng Việt (bản tiếng Anh: **Quiz documents**, **Select all**, **Clear**, **Topic**, **Questions**, **✨ Generate quiz**, **Submit**, **↺ Try again**, **QUIZ HISTORY**).
 3. Trong **Tài liệu làm quiz**, tích một hoặc nhiều file. Mặc định chọn mọi file sẵn sàng trong workspace; có **Chọn tất cả** và **Bỏ chọn**. File **Cần nạp lại tài liệu** không được chọn. Phải chọn ít nhất một file mới bật nút tạo quiz.
 4. Nhập **chủ đề** (ví dụ "Dependency Injection") để lấy các đoạn liên quan nhất **trong các file đã chọn**, hoặc để trống để lấy mẫu trong phạm vi đó. Chọn số câu (3/5/7/10) rồi bấm **✨ Tạo quiz**. Trong lúc tạo, phạm vi tài liệu, chủ đề và số câu được khóa; vẫn có nút Hủy.
 5. Chọn đáp án, bấm **Nộp bài**. Đáp án đúng tô xanh, lựa chọn sai tô đỏ; mỗi câu hiện giải thích và nguồn (rê chuột vào nguồn để xem đoạn trích).

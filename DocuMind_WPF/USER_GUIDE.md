@@ -71,7 +71,7 @@ dotnet test DocuMind.slnx --no-build
 dotnet run --project DocuMind.WPF
 ```
 
-Kết quả mong đợi: build 0 warning, 0 error; toàn bộ test pass (116 test tại thời điểm viết, ngày 17/11/2026). Test dùng AI/HTTP giả và SQLite tạm nên không cần API key và không gọi API thật.
+Kết quả mong đợi: build 0 warning, 0 error; toàn bộ test pass (118 test tại thời điểm viết, ngày 17/11/2026). Test dùng AI/HTTP giả và SQLite tạm nên không cần API key và không gọi API thật.
 
 ### 3.3 Dữ liệu nằm ở đâu
 
