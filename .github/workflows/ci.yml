@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: ${{ matrix.name }}
+    # DocuMind uses WPF and Windows DPAPI, so its tests only run on Windows.
+    # ASM1 and ASM2 run on the same runner to keep one setup for the whole repo.
+    runs-on: windows-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: DocuMind_WPF
+            solution: DocuMind_WPF/DocuMind.slnx
+          - name: ASM1
+            solution: ASM1/ASM1.slnx
+          - name: ASM2
+            solution: ASM2/ASM2.slnx
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore ${{ matrix.solution }}
+
+      - name: Build
+        run: dotnet build ${{ matrix.solution }} --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test ${{ matrix.solution }} --configuration Release --no-build --logger "trx;LogFileName=results.trx" --results-directory TestResults/${{ matrix.name }}
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.name }}
+          path: TestResults/${{ matrix.name }}
