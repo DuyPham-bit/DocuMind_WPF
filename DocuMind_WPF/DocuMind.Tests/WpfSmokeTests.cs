@@ -58,6 +58,18 @@ public class WpfSmokeTests
                     $"Embedding test button must fit the viewport: {bounds}; width {viewport.ActualWidth}.");
                 Assert.IsType<PasswordBox>(settings.FindName("KeyBox"));
                 settings.Close();
+
+                // Verify bilingual EN / VI toggle and Workspace display
+                DocuMind.WPF.Localization.UiText.Current.IsVietnamese = false;
+                Assert.Equal("My Workspace", new DocuMind.Domain.Entities.Workspace { Name = "My Workspace" }.ToString());
+                DocuMind.WPF.Localization.UiText.Current.ToggleLanguageCommand.Execute(null);
+                main.Dispatcher.Invoke(() => { }, DispatcherPriority.DataBind);
+                main.UpdateLayout();
+                Assert.Contains("Tóm tắt", mainVm.PromptTemplates.Select(t => t.Title));
+                Assert.Contains(Descendants(main).OfType<Button>(), b => Equals(b.Content, "Xuất MD"));
+                DocuMind.WPF.Localization.UiText.Current.ToggleLanguageCommand.Execute(null);
+                Assert.Contains("Summarize", mainVm.PromptTemplates.Select(t => t.Title));
+
                 Assert.True(main.IsVisible);
                 main.Close();
                 completion.SetResult();

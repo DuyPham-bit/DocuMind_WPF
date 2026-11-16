@@ -12,48 +12,51 @@ public sealed class ChatProviderFactory(IDbContextFactory<AppDbContext> contexts
     public IChatCompletionService CreateTemporary(ProviderConfigDraft draft)
     {
         Validate(draft);
+        var embeddingModel = NormalizeEmbeddingModel(draft.ProviderType, draft.EmbeddingModel);
         return draft.ProviderType == AiProviderType.Gemini
-            ? new GeminiAiService(http, draft.ApiKey, draft.ChatModel, draft.EmbeddingModel, draft.BaseUrl)
-            : new OpenAiCompatibleService(http, draft.ApiKey, draft.BaseUrl, draft.ChatModel, draft.ProviderType, draft.EmbeddingModel);
+            ? new GeminiAiService(http, draft.ApiKey, draft.ChatModel, embeddingModel, draft.BaseUrl)
+            : new OpenAiCompatibleService(http, draft.ApiKey, draft.BaseUrl, draft.ChatModel, draft.ProviderType, embeddingModel);
     }
 
     public IEmbeddingService CreateTemporaryEmbedding(ProviderConfigDraft draft)
     {
-        var service = (IEmbeddingService)CreateTemporary(draft);
-        if (!service.SupportsEmbeddings || string.IsNullOrWhiteSpace(draft.EmbeddingModel))
+        var normalized = draft with { EmbeddingModel = NormalizeEmbeddingModel(draft.ProviderType, draft.EmbeddingModel) };
+        var service = (IEmbeddingService)CreateTemporary(normalized);
+        if (!service.SupportsEmbeddings || string.IsNullOrWhiteSpace(normalized.EmbeddingModel))
             throw new InvalidOperationException("Provider chỉ hỗ trợ chat hoặc chưa chọn model embedding. Hãy cấu hình embedding độc lập rồi re-index.");
         return service;
     }
 
     public async Task SaveAsync(ProviderConfigDraft draft, CancellationToken ct = default)
     {
-        Validate(draft);
-        if (draft.UseForEmbedding) CreateTemporaryEmbedding(draft);
-        var encrypted = secrets.Protect(draft.ApiKey); // Fail before tracking or changing any settings.
+        var normalized = draft with { EmbeddingModel = NormalizeEmbeddingModel(draft.ProviderType, draft.EmbeddingModel) };
+        Validate(normalized);
+        if (normalized.UseForEmbedding) CreateTemporaryEmbedding(normalized);
+        var encrypted = secrets.Protect(normalized.ApiKey); // Fail before tracking or changing any settings.
         await using var db = await contexts.CreateDbContextAsync(ct);
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         await db.ProviderSettings.Where(p => p.IsActive).ExecuteUpdateAsync(s => s.SetProperty(p => p.IsActive, false), ct);
-        if (draft.UseForEmbedding)
+        if (normalized.UseForEmbedding)
             await db.ProviderSettings.Where(p => p.IsEmbeddingActive).ExecuteUpdateAsync(s => s.SetProperty(p => p.IsEmbeddingActive, false), ct);
         var settings = await db.ProviderSettings.ToListAsync(ct);
         foreach (var setting in settings)
         {
             setting.IsActive = false;
-            if (draft.UseForEmbedding) setting.IsEmbeddingActive = false;
+            if (normalized.UseForEmbedding) setting.IsEmbeddingActive = false;
         }
-        var target = settings.SingleOrDefault(x => x.ProviderType == draft.ProviderType);
+        var target = settings.SingleOrDefault(x => x.ProviderType == normalized.ProviderType);
         if (target == null)
         {
-            target = new ProviderSetting { ProviderType = draft.ProviderType };
+            target = new ProviderSetting { ProviderType = normalized.ProviderType };
             db.ProviderSettings.Add(target);
         }
         target.EncryptedApiKey = encrypted;
-        target.ChatModel = draft.ChatModel.Trim();
-        target.EmbeddingModel = draft.EmbeddingModel.Trim();
-        target.BaseUrl = EffectiveEndpoint(draft.ProviderType, draft.BaseUrl);
-        target.Temperature = draft.Temperature;
+        target.ChatModel = normalized.ChatModel.Trim();
+        target.EmbeddingModel = normalized.EmbeddingModel.Trim();
+        target.BaseUrl = EffectiveEndpoint(normalized.ProviderType, normalized.BaseUrl);
+        target.Temperature = normalized.Temperature;
         target.IsActive = true;
-        target.IsEmbeddingActive = draft.UseForEmbedding;
+        target.IsEmbeddingActive = normalized.UseForEmbedding;
         await db.SaveChangesAsync(ct); // One atomic EF save for key and active flags.
         await transaction.CommitAsync(ct);
     }
@@ -63,16 +66,27 @@ public sealed class ChatProviderFactory(IDbContextFactory<AppDbContext> contexts
         await using var db = await contexts.CreateDbContextAsync(ct);
         var setting = await db.ProviderSettings.AsNoTracking().SingleOrDefaultAsync(x => x.ProviderType == provider, ct);
         if (setting == null) return Defaults(provider);
-        try { return ToDraft(setting); }
+        var hasActiveEmbedding = await db.ProviderSettings.AsNoTracking().AnyAsync(x => x.IsEmbeddingActive, ct);
+        try
+        {
+            var draft = ToDraft(setting);
+            if (!hasActiveEmbedding && SupportsDefaultEmbedding(provider) && !string.IsNullOrWhiteSpace(draft.EmbeddingModel))
+            {
+                draft = draft with { UseForEmbedding = true };
+            }
+            return draft;
+        }
         catch (InvalidOperationException)
         {
-            return new(setting.ProviderType, "", setting.ChatModel, setting.EmbeddingModel, setting.BaseUrl,
-                setting.Temperature, setting.IsEmbeddingActive, KeyNeedsReplacement: true);
+            return new(setting.ProviderType, "", setting.ChatModel,
+                NormalizeEmbeddingModel(setting.ProviderType, setting.EmbeddingModel), setting.BaseUrl,
+                setting.Temperature, setting.IsEmbeddingActive || (!hasActiveEmbedding && SupportsDefaultEmbedding(provider)), KeyNeedsReplacement: true);
         }
     }
 
     private ProviderConfigDraft ToDraft(ProviderSetting setting) => new(setting.ProviderType,
-        secrets.Unprotect(setting.EncryptedApiKey), setting.ChatModel, setting.EmbeddingModel,
+        secrets.Unprotect(setting.EncryptedApiKey), setting.ChatModel,
+        NormalizeEmbeddingModel(setting.ProviderType, setting.EmbeddingModel),
         setting.BaseUrl, setting.Temperature, setting.IsEmbeddingActive);
 
     public async Task<ProviderSetting?> GetActiveSettingAsync()
@@ -93,20 +107,29 @@ public sealed class ChatProviderFactory(IDbContextFactory<AppDbContext> contexts
         await using var db = await contexts.CreateDbContextAsync(ct);
         var setting = await db.ProviderSettings.AsNoTracking().SingleOrDefaultAsync(x => x.IsEmbeddingActive, ct)
             ?? throw new InvalidOperationException("Chưa chọn provider embedding. Direct Chat vẫn dùng được; hãy chọn embedding trong Cài đặt và re-index để dùng RAG.");
-        return new(CreateTemporaryEmbedding(ToDraft(setting)), setting.ProviderType, setting.EmbeddingModel,
-            EffectiveEndpoint(setting.ProviderType, setting.BaseUrl));
+        var draft = ToDraft(setting);
+        return new(CreateTemporaryEmbedding(draft), draft.ProviderType, draft.EmbeddingModel,
+            EffectiveEndpoint(draft.ProviderType, draft.BaseUrl));
     }
 
     public static ProviderConfigDraft Defaults(AiProviderType provider) => provider switch
     {
-        AiProviderType.Gemini => new(provider, "", "gemini-2.5-flash", "text-embedding-004"),
-        AiProviderType.OpenAI => new(provider, "", "gpt-4o-mini", "text-embedding-3-small"),
+        AiProviderType.Gemini => new(provider, "", "gemini-2.5-flash", GeminiAiService.DefaultEmbeddingModel, UseForEmbedding: true),
+        AiProviderType.OpenAI => new(provider, "", "gpt-4o-mini", "text-embedding-3-small", UseForEmbedding: true),
         AiProviderType.Groq => new(provider, "", "llama-3.3-70b-versatile"),
         AiProviderType.OllamaLocal => new(provider, "", "llama3"),
         AiProviderType.OpenRouter => new(provider, "", "openrouter/free", "nvidia/nemotron-3-embed-1b:free",
             "https://openrouter.ai/api/v1", Temperature: .3, UseForEmbedding: true),
         _ => throw new NotSupportedException("Provider không được hỗ trợ.")
     };
+
+    private static string NormalizeEmbeddingModel(AiProviderType provider, string? embeddingModel) =>
+        provider == AiProviderType.Gemini
+            ? GeminiAiService.NormalizeEmbeddingModel(embeddingModel)
+            : embeddingModel?.Trim() ?? string.Empty;
+
+    private static bool SupportsDefaultEmbedding(AiProviderType provider) =>
+        provider is AiProviderType.Gemini or AiProviderType.OpenAI or AiProviderType.OpenRouter;
 
     public static string EffectiveEndpoint(AiProviderType provider, string url) => string.IsNullOrWhiteSpace(url) ? provider switch
     {

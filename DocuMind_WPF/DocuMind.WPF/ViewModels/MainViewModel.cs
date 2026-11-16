@@ -11,6 +11,7 @@ using DocuMind.Application.Interfaces;
 using DocuMind.Application.Services;
 using DocuMind.Domain.Entities;
 using DocuMind.Domain.Enums;
+using DocuMind.WPF.Localization;
 using DocuMind.WPF.Models;
 using Microsoft.Win32;
 
@@ -45,9 +46,28 @@ public partial class MainViewModel : ObservableObject
     {
         _rag = rag; _providers = providers; _workspaces = workspaces; _history = history;
         ChatMessages.CollectionChanged += (_, _) => OnPropertyChanged(nameof(IsChatEmpty));
-        PromptTemplates.Add(new("Summarize", "Summarize key ideas", "Summarize the key ideas in the documents in this workspace."));
-        PromptTemplates.Add(new("Study questions", "Create a knowledge check", "Create five study questions with answers based on the uploaded documents."));
-        PromptTemplates.Add(new("Explain concepts", "Clarify key terms", "Explain the most important concepts in the uploaded documents."));
+        UiText.Current.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(UiText.IsVietnamese)) RefreshPromptTemplates();
+        };
+        RefreshPromptTemplates();
+    }
+
+    private void RefreshPromptTemplates()
+    {
+        PromptTemplates.Clear();
+        if (UiText.Current.IsVietnamese)
+        {
+            PromptTemplates.Add(new("Tóm tắt", "Tóm tắt ý chính", "Hãy tóm tắt các ý chính quan trọng nhất trong tài liệu thuộc workspace này."));
+            PromptTemplates.Add(new("Câu hỏi ôn tập", "Tạo bộ câu hỏi kiểm tra", "Hãy tạo 5 câu hỏi ôn tập kèm đáp án ngắn gọn dựa trên tài liệu đã nạp."));
+            PromptTemplates.Add(new("Giải thích khái niệm", "Làm rõ thuật ngữ", "Hãy giải thích các khái niệm quan trọng nhất có trong tài liệu đã nạp."));
+        }
+        else
+        {
+            PromptTemplates.Add(new("Summarize", "Summarize key ideas", "Summarize the key ideas in the documents in this workspace."));
+            PromptTemplates.Add(new("Study questions", "Create a knowledge check", "Create five study questions with answers based on the uploaded documents."));
+            PromptTemplates.Add(new("Explain concepts", "Clarify key terms", "Explain the most important concepts in the uploaded documents."));
+        }
     }
 
     partial void OnIsBusyChanged(bool value) => RefreshCommands();
@@ -81,6 +101,29 @@ public partial class MainViewModel : ObservableObject
             ActiveProviderInfo = active == null ? "Not configured" : $"{active.ProviderType} · {active.ChatModel}";
         }
         catch (Exception ex) { ActiveProviderInfo = UserErrors.Describe(ex); }
+    }
+
+    public async Task OnProviderSettingsClosedAsync(bool savedSuccessfully)
+    {
+        await RefreshActiveProviderInfoAsync();
+        if (!savedSuccessfully || SelectedWorkspace == null || !CanWork) return;
+
+        var pendingPaths = UploadedFiles
+            .Where(f => f.NeedsReindex && !string.IsNullOrWhiteSpace(f.SourcePath) && File.Exists(f.SourcePath))
+            .Select(f => f.SourcePath)
+            .ToList();
+        if (pendingPaths.Count == 0) return;
+
+        try
+        {
+            await _providers.GetEmbeddingSessionAsync();
+        }
+        catch
+        {
+            return;
+        }
+
+        await IngestFilesAsync(pendingPaths);
     }
 
     partial void OnSelectedWorkspaceChanged(Workspace? value) => _ = ReloadSelectedWorkspaceAsync();

@@ -26,6 +26,7 @@ public partial class SettingsViewModel(IChatProviderFactory providerFactory) : O
     [ObservableProperty] private string _statusMessage = "";
     [ObservableProperty] private bool _isSuccessStatus;
     public Action? CloseAction { get; set; }
+    public bool SavedSuccessfully { get; private set; }
     public bool IsEditable => !IsBusy && !IsLoading;
     public ProviderConfigDraft CaptureDraft() => new(SelectedProvider, ApiKey, ChatModel, EmbeddingModel, BaseUrl, Temperature, UseForEmbedding);
 
@@ -125,10 +126,12 @@ public partial class SettingsViewModel(IChatProviderFactory providerFactory) : O
     private async Task SaveAsync()
     {
         var draft = CaptureDraft();
+        SavedSuccessfully = false;
         IsBusy = true; IsSuccessStatus = false;
         try
         {
             await providerFactory.SaveAsync(draft);
+            SavedSuccessfully = true;
             IsSuccessStatus = true; StatusMessage = "Provider settings saved.";
             CloseAction?.Invoke();
         }

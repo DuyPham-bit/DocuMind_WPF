@@ -116,6 +116,34 @@ public class WorkspaceRegressionTests
         Assert.Equal("old content", Assert.Single((await rag.ChatWithRagAsync(SqliteFixture.WorkspaceId, "system", "question")).Sources).Content);
     }
 
+    [Fact]
+    public async Task SavingProviderAutomaticallyReindexesPendingDocuments()
+    {
+        using var fixture = new SqliteFixture();
+        var repository = new EfRepository<Workspace>(fixture);
+        var store = new EfDocumentStore(fixture);
+        var providers = new FakeProviders();
+        var path = fixture.File("pending.txt");
+
+        // Simulate a document whose earlier ingest failed (Staging -> Failed) before API key was fixed
+        var staging = await store.BeginAsync(SqliteFixture.WorkspaceId, path, CancellationToken.None);
+        await store.FailAsync(staging.Id);
+
+        var vm = new MainViewModel(new(providers, new FakeParser(), store), providers, repository, new EfChatHistoryStore(fixture));
+        await vm.InitializeAsync();
+        await ProviderRegressionTests.WaitUntilAsync(() => !vm.IsLoading);
+        Assert.True(Assert.Single(vm.UploadedFiles).NeedsReindex);
+
+        // Closing settings without saving does not auto-ingest
+        await vm.OnProviderSettingsClosedAsync(savedSuccessfully: false);
+        Assert.True(Assert.Single(vm.UploadedFiles).NeedsReindex);
+
+        // Closing settings after saving an embedding-capable provider auto-ingests pending files
+        await vm.OnProviderSettingsClosedAsync(savedSuccessfully: true);
+        Assert.False(Assert.Single(vm.UploadedFiles).NeedsReindex);
+        Assert.Contains("Completed 1", vm.BusyStatus);
+    }
+
     private sealed class DelayedDocumentStore(IDocumentStore inner) : IDocumentStore
     {
         public required Func<Guid, Task<List<DocumentListItem>>> List;

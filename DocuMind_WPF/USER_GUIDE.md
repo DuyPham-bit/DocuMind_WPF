@@ -127,7 +127,7 @@ Khi mở app lần đầu, góc dưới thanh bên trái hiển thị **`Not con
 
 | Provider | Chat model mặc định | Embedding model mặc định | Base URL mặc định | Ghi chú |
 | :--- | :--- | :--- | :--- | :--- |
-| **Gemini** | `gemini-2.5-flash` | `text-embedding-004` | `https://generativelanguage.googleapis.com/v1beta` | Hỗ trợ chat & embedding qua Google Gemini API |
+| **Gemini** | `gemini-2.5-flash` | `gemini-embedding-001` | `https://generativelanguage.googleapis.com/v1beta` | Tự động bật embedding/RAG mặc định (tự nâng cấp `text-embedding-004` cũ sang `gemini-embedding-001`) |
 | **OpenAI** | `gpt-4o-mini` | `text-embedding-3-small` | `https://api.openai.com/v1` | Cần tài khoản OpenAI có quyền dùng cả chat & embeddings |
 | **Groq** | `llama-3.3-70b-versatile` | *(không có mặc định)* | `https://api.groq.com/openai/v1` | Dùng tốt cho **Direct Chat**; nếu dùng RAG hãy chọn provider embedding riêng (ví dụ OpenRouter hoặc OllamaLocal) |
 

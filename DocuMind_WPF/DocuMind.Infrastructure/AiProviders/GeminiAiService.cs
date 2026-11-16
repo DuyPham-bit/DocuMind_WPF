@@ -14,11 +14,32 @@ public sealed class GeminiAiService : IChatCompletionService, IEmbeddingService
     public bool SupportsChat => true;
     public bool SupportsEmbeddings => !string.IsNullOrWhiteSpace(_embeddingModel);
 
+    public const string DefaultEmbeddingModel = "gemini-embedding-001";
+
     public GeminiAiService(HttpClient http, string apiKey, string model = "gemini-2.5-flash",
-        string embeddingModel = "text-embedding-004", string baseUrl = "")
+        string embeddingModel = DefaultEmbeddingModel, string baseUrl = "")
     {
-        _http = http; _key = apiKey; _model = model; _embeddingModel = embeddingModel;
+        _http = http; _key = apiKey; _model = model;
+        _embeddingModel = NormalizeEmbeddingModel(embeddingModel);
         _endpoint = ChatProviderFactory.EffectiveEndpoint(AiProviderType.Gemini, baseUrl);
+    }
+
+    public static string NormalizeEmbeddingModel(string? model)
+    {
+        var trimmed = model?.Trim() ?? string.Empty;
+        if (trimmed.StartsWith("models/", StringComparison.OrdinalIgnoreCase))
+        {
+            trimmed = trimmed["models/".Length..];
+        }
+
+        // Google retired text-embedding-004 and embedding-001 in 2026 (v1beta embedContent returns 404).
+        if (string.Equals(trimmed, "text-embedding-004", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(trimmed, "embedding-001", StringComparison.OrdinalIgnoreCase))
+        {
+            return DefaultEmbeddingModel;
+        }
+
+        return trimmed;
     }
 
     private HttpRequestMessage Request(string model, string action, object payload)

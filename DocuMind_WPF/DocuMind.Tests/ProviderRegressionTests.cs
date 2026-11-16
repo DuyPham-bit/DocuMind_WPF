@@ -267,4 +267,47 @@ public class ProviderRegressionTests
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         while (!condition()) await Task.Delay(10, timeout.Token);
     }
+
+    [Fact]
+    public async Task GeminiDefaultsAndLegacyTextEmbedding004NormalizeToGeminiEmbedding001()
+    {
+        var geminiDefaults = ChatProviderFactory.Defaults(AiProviderType.Gemini);
+        Assert.Equal("gemini-embedding-001", geminiDefaults.EmbeddingModel);
+        Assert.True(geminiDefaults.UseForEmbedding);
+        Assert.True(ChatProviderFactory.Defaults(AiProviderType.OpenAI).UseForEmbedding);
+
+        using var fixture = new SqliteFixture();
+        var handler = new FakeHandler
+        {
+            Response = _ => new(HttpStatusCode.OK) { Content = new StringContent("{\"embedding\":{\"values\":[1,0]}}") }
+        };
+        using var http = new HttpClient(handler);
+        var secrets = new FakeSecrets();
+        var factory = new ChatProviderFactory(fixture, http, secrets);
+
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.ProviderSettings.Add(new()
+            {
+                ProviderType = AiProviderType.Gemini,
+                EncryptedApiKey = secrets.Protect("gem-key"),
+                ChatModel = "gemini-2.5-flash",
+                EmbeddingModel = "text-embedding-004",
+                BaseUrl = "https://generativelanguage.googleapis.com/v1beta",
+                Temperature = 0.5,
+                IsActive = true,
+                IsEmbeddingActive = true
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var loaded = await factory.LoadDraftAsync(AiProviderType.Gemini);
+        Assert.Equal("gemini-embedding-001", loaded.EmbeddingModel);
+
+        var session = await factory.GetEmbeddingSessionAsync();
+        Assert.Equal("gemini-embedding-001", session.Model);
+        await session.Service.GenerateEmbeddingAsync("hello");
+        var req = Assert.Single(handler.Requests);
+        Assert.Contains("/models/gemini-embedding-001:embedContent", req.Url.AbsoluteUri);
+    }
 }

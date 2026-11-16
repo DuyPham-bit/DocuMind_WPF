@@ -13,4 +13,6 @@ public class Workspace
 
     public ICollection<DocumentChunk> Chunks { get; set; } = new List<DocumentChunk>();
     public ICollection<ChatMessage> Messages { get; set; } = new List<ChatMessage>();
+
+    public override string ToString() => Name;
 }

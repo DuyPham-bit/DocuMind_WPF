@@ -50,8 +50,8 @@ public partial class MainWindow : Window
         };
         dialog.ShowDialog();
 
-        // Refresh provider display after settings dialog closes
-        _ = _viewModel.RefreshActiveProviderInfoAsync();
+        // Refresh provider display and auto-ingest any pending documents after saving API config.
+        _ = _viewModel.OnProviderSettingsClosedAsync(settingsVm.SavedSuccessfully);
     }
 
     private void TxtInput_KeyDown(object sender, KeyEventArgs e)
