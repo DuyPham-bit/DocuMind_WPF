@@ -128,4 +128,20 @@ public sealed partial class UiText : ObservableObject
     public string BaseUrlLabel => "Base URL";
     public string TestConnectionButton => IsVietnamese ? "Kiểm tra kết nối" : "Test connection";
     public string SaveProviderButton => IsVietnamese ? "Lưu cấu hình" : "Save provider";
+
+    // Quiz window (modal: language is fixed while it is open, so values are read once when it renders)
+    public string QuizWindowTitle => IsVietnamese ? "DocuMind – Quiz ôn tập" : "DocuMind – Study quiz";
+    public string QuizHeading => IsVietnamese ? "📝 Quiz ôn tập từ tài liệu" : "📝 Study quiz from your documents";
+    public string QuizTopicLabel => IsVietnamese ? "Chủ đề:" : "Topic:";
+    public string QuizTopicTooltip => IsVietnamese
+        ? "Ví dụ: Dependency Injection, vòng đời DbContext... Để trống để lấy mẫu trong các tài liệu đã chọn"
+        : "For example: Dependency Injection, DbContext lifetime... Leave empty to sample the selected documents";
+    public string QuizCountLabel => IsVietnamese ? "Số câu:" : "Questions:";
+    public string QuizGenerateButton => IsVietnamese ? "✨ Tạo quiz" : "✨ Generate quiz";
+    public string QuizDocumentsHeader => IsVietnamese ? "Tài liệu làm quiz" : "Quiz documents";
+    public string QuizSelectAllButton => IsVietnamese ? "Chọn tất cả" : "Select all";
+    public string QuizClearSelectionButton => IsVietnamese ? "Bỏ chọn" : "Clear";
+    public string QuizHistoryHeader => IsVietnamese ? "LỊCH SỬ ÔN TẬP" : "QUIZ HISTORY";
+    public string QuizRetryButton => IsVietnamese ? "↺ Làm lại" : "↺ Try again";
+    public string QuizSubmitButton => IsVietnamese ? "Nộp bài" : "Submit";
 }

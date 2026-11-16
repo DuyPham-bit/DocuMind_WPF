@@ -71,7 +71,7 @@ dotnet test DocuMind.slnx --no-build
 dotnet run --project DocuMind.WPF
 ```
 
-Kết quả mong đợi: build 0 warning, 0 error; toàn bộ test pass (116 test tại thời điểm viết, ngày 17/11/2026). Test dùng AI/HTTP giả và SQLite tạm nên không cần API key và không gọi API thật.
+Kết quả mong đợi: build 0 warning, 0 error; toàn bộ test pass (118 test tại thời điểm viết, ngày 17/11/2026). Test dùng AI/HTTP giả và SQLite tạm nên không cần API key và không gọi API thật.
 
 ### 3.3 Dữ liệu nằm ở đâu
 
@@ -139,9 +139,11 @@ Nút **EN / VI** đổi toàn bộ giao diện chính giữa tiếng Anh và ti�
 5. **Lịch sử hội thoại:** tab **HISTORY** ở thanh bên liệt kê các cuộc trò chuyện đã lưu của workspace; bấm để mở lại, nút xóa để xóa một cuộc. **New chat** (*Chat mới*) bắt đầu cuộc mới, không xóa cuộc cũ.
 6. **QUICK START:** các gợi ý *Summarize*, *Study questions*, *Explain concepts* điền sẵn câu hỏi vào ô nhập để sửa rồi gửi.
 7. **Study quiz** (*Quiz ôn tập*):
-   - Trong **Tài liệu làm quiz**, tích file muốn dùng (mặc định chọn mọi file sẵn sàng; có **Chọn tất cả** / **Bỏ chọn**). File cần nạp lại bị khóa.
-   - Nhập **Chủ đề** để lấy các đoạn liên quan nhất, hoặc để trống để lấy mẫu rải đều trong các file đã chọn. Chọn **Số câu** (3/5/7/10) rồi **✨ Tạo quiz**.
-   - Chọn đáp án, **Nộp bài**: đáp án đúng tô xanh, lựa chọn sai tô đỏ, mỗi câu có giải thích và nguồn. **↺ Làm lại** để làm lại cùng bộ câu; mỗi lần nộp được lưu vào **LỊCH SỬ ÔN TẬP**.
+   - Cửa sổ Quiz theo ngôn ngữ đang chọn ở cửa sổ chính (đổi EN / VI trước khi mở Quiz).
+   - Trong **Quiz documents** (*Tài liệu làm quiz*), tích file muốn dùng (mặc định chọn mọi file sẵn sàng; có **Select all** / **Clear**). File cần nạp lại bị khóa.
+   - Nhập **Topic** (*Chủ đề*) để lấy các đoạn liên quan nhất, hoặc để trống để lấy mẫu rải đều trong các file đã chọn. Chọn **Questions** (*Số câu*: 3/5/7/10) rồi **✨ Generate quiz** (*Tạo quiz*).
+   - Chọn đáp án, **Submit** (*Nộp bài*): đáp án đúng tô xanh, lựa chọn sai tô đỏ, mỗi câu có giải thích và nguồn. **↺ Try again** (*Làm lại*) để làm lại cùng bộ câu; mỗi lần nộp được lưu vào **QUIZ HISTORY** (*Lịch sử ôn tập*).
+   - Câu hỏi do AI soạn vẫn bằng tiếng Việt, vì prompt và tài liệu môn học đều là tiếng Việt.
    - Chi tiết: [docs/09_Quiz_On_Tap.md](docs/09_Quiz_On_Tap.md).
 8. **Export** (*Xuất MD*): lưu hội thoại đang mở ra file `.md`, kèm mode, provider, model, temperature và nguồn của từng tin nhắn.
 
@@ -289,7 +291,7 @@ Bộ test bao phủ: chunking và cosine; DPAPI; migration DB cũ, backup/restor
 | Không giải mã được key cũ | DB copy từ máy/tài khoản Windows khác | Nhập lại key và **Save provider** |
 | **Open source** không mở được | File gốc đã đổi tên, di chuyển hoặc xóa | Kiểm tra file gốc; lịch sử chat vẫn giữ đoạn trích |
 
-**Giới hạn hiện tại:** chưa có OCR cho PDF scan, chưa đọc `.docx`, chưa streaming từng token khi trả lời; cửa sổ Quiz hiện chỉ có tiếng Việt.
+**Giới hạn hiện tại:** chưa có OCR cho PDF scan, chưa đọc `.docx`, chưa streaming từng token khi trả lời; câu hỏi Quiz luôn được AI soạn bằng tiếng Việt.
 
 **Checklist trước demo:**
 

@@ -28,7 +28,7 @@ public sealed class QuizService(RagOrchestratorService rag, IChatProviderFactory
         IReadOnlyCollection<Guid>? documentIds = null)
     {
         if (documentIds is { Count: 0 })
-            throw new QuizUnavailableException("Hãy chọn ít nhất một tài liệu để tạo quiz.");
+            throw new QuizUnavailableException(AppText.T("Select at least one document to create a quiz.", "Hãy chọn ít nhất một tài liệu để tạo quiz."));
         // Snapshot the selection: changing UI state must not change an in-flight generation.
         var selectedIds = documentIds?.ToArray();
         questionCount = Math.Clamp(questionCount, MinQuestions, MaxQuestions);
@@ -38,8 +38,8 @@ public sealed class QuizService(RagOrchestratorService rag, IChatProviderFactory
             : await rag.RetrieveSourcesAsync(workspaceId, topic, Math.Max(6, questionCount), ct, selectedIds);
         if (sources.Count == 0)
             throw new QuizUnavailableException(string.IsNullOrEmpty(topic)
-                ? "Phạm vi tài liệu chưa có nội dung dùng được với cấu hình embedding hiện tại. Hãy nạp hoặc re-index tài liệu."
-                : "Không tìm thấy đoạn đủ liên quan trong phạm vi tài liệu đã chọn. Thử chủ đề khác hoặc để trống chủ đề.");
+                ? AppText.T("The selected documents have no content usable with the current embedding settings. Upload or re-index them.", "Phạm vi tài liệu chưa có nội dung dùng được với cấu hình embedding hiện tại. Hãy nạp hoặc re-index tài liệu.")
+                : AppText.T("No passage in the selected documents is relevant enough. Try another topic or leave the topic empty.", "Không tìm thấy đoạn đủ liên quan trong phạm vi tài liệu đã chọn. Thử chủ đề khác hoặc để trống chủ đề."));
 
         var session = await providers.GetChatSessionAsync(ct);
         var (system, user) = BuildPrompt(topic, questionCount, sources);
@@ -47,8 +47,8 @@ public sealed class QuizService(RagOrchestratorService rag, IChatProviderFactory
         // Models tend to put the right option first; shuffling keeps "always pick A" from scoring well.
         var questions = Parse(raw, sources, questionCount).Select(q => ShuffleOptions(q, Random.Shared)).ToList();
         if (questions.Count == 0)
-            throw new QuizUnavailableException("AI chưa trả về câu hỏi đúng định dạng. Hãy bấm tạo lại hoặc giảm số câu.");
-        var scopeLabel = selectedIds == null ? "Toàn bộ tài liệu" : "Tài liệu đã chọn";
+            throw new QuizUnavailableException(AppText.T("The AI did not return questions in the expected format. Generate again or ask for fewer questions.", "AI chưa trả về câu hỏi đúng định dạng. Hãy bấm tạo lại hoặc giảm số câu."));
+        var scopeLabel = selectedIds == null ? AppText.T("All documents", "Toàn bộ tài liệu") : AppText.T("Selected documents", "Tài liệu đã chọn");
         return new(string.IsNullOrEmpty(topic) ? scopeLabel : topic, questions, session);
     }
 
