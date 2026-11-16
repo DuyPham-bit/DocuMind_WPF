@@ -40,14 +40,17 @@ public partial class App : System.Windows.Application
         services.AddSingleton<ISecretProtector, WindowsDpapiSecretProtector>();
         services.AddSingleton<IDocumentStore, EfDocumentStore>();
         services.AddSingleton<IChatHistoryStore, EfChatHistoryStore>();
+        services.AddSingleton<IQuizStore, EfQuizStore>();
 
         // 4. AI Provider Factory & Orchestrator
         services.AddScoped<IChatProviderFactory, ChatProviderFactory>();
         services.AddScoped<RagOrchestratorService>();
+        services.AddScoped<QuizService>();
 
         // 5. ViewModels
         services.AddTransient<MainViewModel>();
         services.AddTransient<SettingsViewModel>();
+        services.AddTransient<QuizViewModel>();
 
         // 6. Views
         services.AddTransient<MainWindow>();

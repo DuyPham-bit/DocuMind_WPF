@@ -1,10 +1,13 @@
 # DocuMind — tài liệu vận hành
 
+**User guide chính (setup, sử dụng, giải thích code): [10_Huong_dan_Setup_va_Code.md](10_Huong_dan_Setup_va_Code.md).**
+
 Tài liệu hiện hành ngày 14/11/2026: [Đặc tả đầy đủ dự án Word](07_Dac_ta_du_an.docx), [nguồn Markdown](07_Dac_ta_du_an.md) và [review cuối cùng](08_Review_cuoi.md). Đặc tả bao gồm kiến trúc, dữ liệu, toàn bộ luồng, vận hành và giới hạn. Đợt review sửa lỗi thông báo bị ẩn sau thao tác và đồng bộ SQLite script với migration mới nhất; 68 test pass.
 
 Lịch sử đợt sửa trước: [Sửa lỗi, dữ liệu và nghiệm thu](05_Fixes_va_Nghiem_thu.md), kiểm tra ngày 05/11/2026 trên Windows, .NET 10 và SQLite thật.
 
 - Hướng đi của nhóm: **mỗi thành viên dùng Ollama local**, xem [cài đặt và cấu hình miễn phí](06_Ollama_Local.md).
+- Tính năng học tập: [Quiz ôn tập từ tài liệu](09_Quiz_On_Tap.md) — AI ra đề trắc nghiệm, app chấm điểm và lưu lịch sử.
 - Chạy app: `dotnet run --project DocuMind.WPF`.
 - Kiểm thử: `dotnet test DocuMind.slnx`.
 - DB hiện hành: `%LOCALAPPDATA%\DocuMind\documind_local.db`, nâng cấp bằng EF migrations và backup tự động trước thay đổi schema.

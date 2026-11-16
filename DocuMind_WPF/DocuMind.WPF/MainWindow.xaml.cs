@@ -22,6 +22,7 @@ public partial class MainWindow : Window
         DataContext = _viewModel;
 
         _viewModel.OpenSettingsAction = ShowSettingsDialog;
+        _viewModel.OpenQuizAction = ShowQuizWindow;
 
         // Auto scroll to bottom when new messages arrive
         ((INotifyCollectionChanged)_viewModel.ChatMessages).CollectionChanged += (s, e) =>
@@ -52,6 +53,12 @@ public partial class MainWindow : Window
 
         // Refresh provider display and auto-ingest any pending documents after saving API config.
         _ = _viewModel.OnProviderSettingsClosedAsync(settingsVm.SavedSuccessfully);
+    }
+
+    private void ShowQuizWindow(DocuMind.Domain.Entities.Workspace workspace)
+    {
+        var quizVm = _serviceProvider.GetRequiredService<QuizViewModel>();
+        new QuizWindow(quizVm, workspace.Id, workspace.Name) { Owner = this }.ShowDialog();
     }
 
     private void TxtInput_KeyDown(object sender, KeyEventArgs e)

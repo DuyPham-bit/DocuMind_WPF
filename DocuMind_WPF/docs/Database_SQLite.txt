@@ -1,3 +1,6 @@
+
+
+BEGIN TRANSACTION;
 CREATE TABLE IF NOT EXISTS "__EFMigrationsHistory" (
     "MigrationId" TEXT NOT NULL CONSTRAINT "PK___EFMigrationsHistory" PRIMARY KEY,
     "ProductVersion" TEXT NOT NULL
@@ -204,3 +207,25 @@ INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
 VALUES ('20261114120000_TranslateDefaultWorkspace', '10.0.14');
 
 COMMIT;
+
+BEGIN TRANSACTION;
+CREATE TABLE "QuizAttempts" (
+    "Id" TEXT NOT NULL CONSTRAINT "PK_QuizAttempts" PRIMARY KEY,
+    "WorkspaceId" TEXT NOT NULL,
+    "Topic" TEXT NOT NULL,
+    "QuestionCount" INTEGER NOT NULL,
+    "CorrectCount" INTEGER NOT NULL,
+    "QuestionsJson" TEXT NOT NULL,
+    "Provider" TEXT NOT NULL,
+    "Model" TEXT NOT NULL,
+    "CreatedAt" TEXT NOT NULL,
+    CONSTRAINT "FK_QuizAttempts_Workspaces_WorkspaceId" FOREIGN KEY ("WorkspaceId") REFERENCES "Workspaces" ("Id") ON DELETE CASCADE
+);
+
+CREATE INDEX "IX_QuizAttempts_WorkspaceId_CreatedAt" ON "QuizAttempts" ("WorkspaceId", "CreatedAt");
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261116140000_AddQuizAttempts', '10.0.14');
+
+COMMIT;
+

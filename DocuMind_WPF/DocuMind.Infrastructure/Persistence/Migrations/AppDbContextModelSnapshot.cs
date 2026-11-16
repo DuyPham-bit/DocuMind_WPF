@@ -256,6 +256,48 @@ namespace DocuMind.Infrastructure.Persistence.Migrations
                     b.ToTable("ProviderSettings");
                 });
 
+            modelBuilder.Entity("DocuMind.Domain.Entities.QuizAttempt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("CorrectCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("QuestionCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("QuestionsJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Topic")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WorkspaceId", "CreatedAt");
+
+                    b.ToTable("QuizAttempts");
+                });
+
             modelBuilder.Entity("DocuMind.Domain.Entities.Workspace", b =>
                 {
                     b.Property<Guid>("Id")
@@ -354,6 +396,17 @@ namespace DocuMind.Infrastructure.Persistence.Migrations
                     b.Navigation("Document");
 
                     b.Navigation("EmbeddingProfile");
+                });
+
+            modelBuilder.Entity("DocuMind.Domain.Entities.QuizAttempt", b =>
+                {
+                    b.HasOne("DocuMind.Domain.Entities.Workspace", "Workspace")
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Workspace");
                 });
 
             modelBuilder.Entity("DocuMind.Domain.Entities.Document", b =>
