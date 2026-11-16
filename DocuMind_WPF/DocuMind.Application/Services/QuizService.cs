@@ -36,7 +36,8 @@ public sealed class QuizService(RagOrchestratorService rag, IChatProviderFactory
         var session = await providers.GetChatSessionAsync(ct);
         var (system, user) = BuildPrompt(topic, questionCount, sources);
         var raw = await session.Service.GenerateResponseAsync(system, user, session.Temperature, ct);
-        var questions = Parse(raw, sources, questionCount);
+        // Models tend to put the right option first; shuffling keeps "always pick A" from scoring well.
+        var questions = Parse(raw, sources, questionCount).Select(q => ShuffleOptions(q, Random.Shared)).ToList();
         if (questions.Count == 0)
             throw new QuizUnavailableException("AI chưa trả về câu hỏi đúng định dạng. Hãy bấm tạo lại hoặc giảm số câu.");
         return new(string.IsNullOrEmpty(topic) ? "Toàn bộ tài liệu" : topic, questions, session);
@@ -104,6 +105,18 @@ public sealed class QuizService(RagOrchestratorService rag, IChatProviderFactory
         if (TryGet(item, "source", out var s) && s.ValueKind == JsonValueKind.Number && s.TryGetInt32(out var id) && id >= 1 && id <= sources.Count)
             source = sources[id - 1];
         return new(text, options, answer, explanation, source);
+    }
+
+    /// <summary>Đảo thứ tự lựa chọn và dời chỉ số đáp án theo, để vị trí đáp án đúng không đoán được.</summary>
+    public static QuizQuestion ShuffleOptions(QuizQuestion question, Random random)
+    {
+        var order = Enumerable.Range(0, question.Options.Count).ToArray();
+        random.Shuffle(order);
+        return question with
+        {
+            Options = order.Select(i => question.Options[i]).ToList(),
+            AnswerIndex = Array.IndexOf(order, question.AnswerIndex)
+        };
     }
 
     private static string StripLabel(string option)

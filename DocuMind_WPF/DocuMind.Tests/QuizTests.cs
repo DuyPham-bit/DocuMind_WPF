@@ -52,6 +52,22 @@ public class QuizTests
     }
 
     [Fact]
+    public void ShuffleKeepsTheCorrectOptionAndSpreadsItsPosition()
+    {
+        var q = new QuizQuestion("Q", ["đúng", "b", "c", "d"], 0, "", null);
+        var random = new Random(42);
+        var positions = new HashSet<int>();
+        for (var i = 0; i < 50; i++)
+        {
+            var shuffled = QuizService.ShuffleOptions(q, random);
+            Assert.Equal("đúng", shuffled.Options[shuffled.AnswerIndex]);
+            Assert.Equal(q.Options.Order(), shuffled.Options.Order());
+            positions.Add(shuffled.AnswerIndex);
+        }
+        Assert.True(positions.Count > 1);
+    }
+
+    [Fact]
     public void GradeCountsOnlyCorrectAnswers()
     {
         var q = new QuizQuestion("Q", ["a", "b"], 1, "", null);
@@ -143,13 +159,17 @@ public class QuizTests
         await vm.GenerateCommand.ExecuteAsync(null);
         Assert.Equal(2, vm.Questions.Count);
         Assert.False(vm.RetryCommand.CanExecute(null));
-        vm.Questions[0].Options[0].IsSelected = true;   // đúng
-        vm.Questions[1].Options[0].IsSelected = true;   // sai (đúng là B)
+        // Lựa chọn đã bị xáo, nên chọn theo AnswerIndex thay vì vị trí cố định.
+        var first = vm.Questions[0]; var second = vm.Questions[1];
+        var secondWrong = (second.Question.AnswerIndex + 1) % second.Options.Count;
+        first.Options[first.Question.AnswerIndex].IsSelected = true;   // đúng
+        second.Options[secondWrong].IsSelected = true;                  // sai
 
         await vm.SubmitCommand.ExecuteAsync(null);
         Assert.StartsWith("Điểm: 1/2", vm.ScoreText);
-        Assert.True(vm.Questions[1].Options[1].IsCorrectAnswer);
-        Assert.True(vm.Questions[1].Options[0].IsWrongChoice);
+        Assert.True(second.Options[second.Question.AnswerIndex].IsCorrectAnswer);
+        Assert.True(second.Options[secondWrong].IsWrongChoice);
+        Assert.Equal("Theo scope", second.Options[second.Question.AnswerIndex].Text);
         Assert.False(vm.SubmitCommand.CanExecute(null));
         Assert.Single(vm.History);
 
