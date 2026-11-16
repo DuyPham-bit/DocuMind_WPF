@@ -1,0 +1,27 @@
+@model DependencyInjectionMvcDemo.Models.Product
+
+@{
+    ViewData["Title"] = "Xác nhận xóa sản phẩm";
+}
+
+<section class="page-card">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Xác nhận xóa sản phẩm #@Model.Id</h1>
+            <p class="page-subtitle">Bạn có chắc muốn xóa sản phẩm này khỏi repository?</p>
+        </div>
+        <a asp-action="Index" class="btn-app btn-app-outline">Quay lại danh sách</a>
+    </div>
+
+    <div class="p-3 mb-4 rounded-3 border bg-light">
+        <div class="fw-bold fs-5">@Model.Name</div>
+        <div class="text-secondary mt-1">Giá: @Model.Price.ToString("N0") VNĐ &middot; Tồn kho: @Model.Stock</div>
+    </div>
+
+    <form asp-action="Delete" method="post" class="d-flex gap-2">
+        @Html.AntiForgeryToken()
+        <input type="hidden" asp-for="Id" />
+        <button type="submit" class="btn-app btn-app-danger">Xác nhận xóa</button>
+        <a asp-action="Index" class="btn-app btn-app-outline">Hủy</a>
+    </form>
+</section>

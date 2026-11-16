@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - DependencyInjectionMvcDemo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+    @{
+        var currentController = ViewContext.RouteData.Values["controller"]?.ToString();
+        var currentAction = ViewContext.RouteData.Values["action"]?.ToString();
+    }
+    <header class="app-header">
+        <div class="container">
+            <nav class="app-nav" aria-label="Điều hướng chính">
+                <a class="brand-link" asp-controller="Products" asp-action="Index">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v6m0 6v6M3 12h6m6 0h6M5.6 5.6l4.2 4.2m4.4 4.4l4.2 4.2M18.4 5.6l-4.2 4.2m-4.4 4.4l-4.2 4.2" />
+                    </svg>
+                    <span class="brand-title">DI MVC Demo</span>
+                    <span class="brand-badge">.NET 10</span>
+                </a>
+                <ul class="nav-links">
+                    <li>
+                        <a class="nav-link-item @(currentController == "Products" && currentAction == "Index" ? "is-active" : "")"
+                           asp-controller="Products" asp-action="Index">Products</a>
+                    </li>
+                    <li>
+                        <a class="nav-link-item @(currentController == "Lifetime" ? "is-active" : "")"
+                           asp-controller="Lifetime" asp-action="Index">Lifetime</a>
+                    </li>
+                    <li>
+                        <a class="nav-link-item nav-link-cta"
+                           asp-controller="Products" asp-action="Create">+ Thêm sản phẩm</a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container app-main">
+        <main role="main">
+            @RenderBody()
+        </main>
+    </div>
+
+    <footer class="app-footer">
+        <div class="container d-flex flex-wrap justify-content-between gap-2">
+            <span>DependencyInjectionMvcDemo &middot; PRN212 Assignment 2 (C# &middot; OOP &middot; Interface &middot; DI Container)</span>
+            <span>Composition Root: <code>Program.cs</code></span>
+        </div>
+    </footer>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

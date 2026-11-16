@@ -1,0 +1,31 @@
+@model DependencyInjectionMvcDemo.Models.Product
+
+@{
+    ViewData["Title"] = "Thêm sản phẩm";
+}
+
+<section class="page-card">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Thêm sản phẩm mới</h1>
+            <p class="page-subtitle">Dữ liệu đi qua <code class="mono">ProductsController</code> -&gt; <code class="mono">IProductService</code> -&gt; <code class="mono">IProductRepository</code>.</p>
+        </div>
+        <a asp-action="Index" class="btn-app btn-app-outline">Quay lại danh sách</a>
+    </div>
+
+    <form asp-action="Create" method="post" class="form-grid">
+        @Html.AntiForgeryToken()
+        <div asp-validation-summary="ModelOnly" class="text-danger small"></div>
+
+        <partial name="_ProductFormFields" model="Model" />
+
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn-app btn-app-accent">Lưu sản phẩm</button>
+            <a asp-action="Index" class="btn-app btn-app-outline">Hủy</a>
+        </div>
+    </form>
+</section>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

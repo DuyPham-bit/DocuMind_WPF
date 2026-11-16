@@ -1,0 +1,28 @@
+@model ProductManagerMvc.Models.Product
+
+@{
+    ViewData["Title"] = "Thêm sản phẩm mới";
+}
+
+<section class="page-card">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Thêm sản phẩm mới</h1>
+            <p class="page-subtitle">Nhập thông tin sản phẩm. Dữ liệu sẽ được kiểm tra qua DataAnnotations &amp; ModelState.</p>
+        </div>
+        <a asp-action="Index" class="btn-app btn-app-outline">Quay lại danh sách</a>
+    </div>
+
+    <form asp-action="Create" method="post" class="form-grid">
+        <partial name="_ProductFormFields" model="Model" />
+
+        <div class="d-flex flex-wrap gap-2 mt-2">
+            <button type="submit" class="btn-app btn-app-accent">Lưu sản phẩm</button>
+            <a asp-action="Index" class="btn-app btn-app-outline">Hủy</a>
+        </div>
+    </form>
+</section>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

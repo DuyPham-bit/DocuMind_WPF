@@ -1,0 +1,98 @@
+@model IEnumerable<ProductManagerMvc.Models.Product>
+
+@{
+    ViewData["Title"] = "Quản lý sản phẩm";
+    string currentQuery = ViewData["Query"] as string ?? string.Empty;
+}
+
+<section class="page-card">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Quản lý sản phẩm</h1>
+            <p class="page-subtitle">Danh sách sản phẩm lưu trên SQL Server thông qua EF Core &amp; LINQ.</p>
+        </div>
+        <a asp-action="Create" class="btn-app btn-app-accent">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            <span>Thêm sản phẩm</span>
+        </a>
+    </div>
+
+    @if (TempData["SuccessMessage"] is string successMsg)
+    {
+        <div class="alert-banner" role="status">@successMsg</div>
+    }
+
+    <form method="get" asp-action="Index" class="search-bar" role="search">
+        <label for="searchQuery" class="visually-hidden">Tìm theo tên hoặc mô tả sản phẩm</label>
+        <input id="searchQuery"
+               type="search"
+               name="q"
+               value="@currentQuery"
+               class="search-input"
+               placeholder="Tìm theo tên hoặc mô tả..." />
+        <button type="submit" class="btn-app btn-app-primary">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35m1.35-5.15a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z" />
+            </svg>
+            <span>Tìm kiếm</span>
+        </button>
+        @if (!string.IsNullOrWhiteSpace(currentQuery))
+        {
+            <a asp-action="Index" class="btn-app btn-app-outline">Xóa lọc</a>
+        }
+    </form>
+
+    @if (!Model.Any())
+    {
+        <div class="p-4 text-center border rounded-3 bg-light">
+            <p class="mb-2 fw-semibold">Không tìm thấy sản phẩm nào phù hợp.</p>
+            <a asp-action="Create" class="btn-app btn-app-accent">Thêm sản phẩm đầu tiên</a>
+        </div>
+    }
+    else
+    {
+        <div class="table-wrapper">
+            <table class="product-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Tên sản phẩm</th>
+                        <th>Giá</th>
+                        <th>Tồn</th>
+                        <th>Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model)
+                    {
+                        <tr>
+                            <td class="fw-semibold">#@item.Id</td>
+                            <td>
+                                <div class="fw-bold">@item.Name</div>
+                                @if (!string.IsNullOrWhiteSpace(item.Description))
+                                {
+                                    <div class="small text-secondary">@item.Description</div>
+                                }
+                            </td>
+                            <td class="fw-semibold">@item.Price.ToString("N0") VNĐ</td>
+                            <td>
+                                <span class="stock-pill @(item.Stock == 0 ? "stock-pill-zero" : "")">
+                                    @item.Stock
+                                </span>
+                            </td>
+                            <td>
+                                <div class="action-group">
+                                    <a asp-action="Details" asp-route-id="@item.Id" class="action-link">Xem</a>
+                                    <a asp-action="Edit" asp-route-id="@item.Id" class="action-link">Sửa</a>
+                                    <a asp-action="Delete" asp-route-id="@item.Id" class="action-link action-link-danger">Xóa</a>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>

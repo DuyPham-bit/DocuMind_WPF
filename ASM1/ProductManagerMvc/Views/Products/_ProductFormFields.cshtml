@@ -1,0 +1,28 @@
+@model ProductManagerMvc.Models.Product
+
+<div asp-validation-summary="ModelOnly" class="field-error" role="alert"></div>
+
+<div class="form-field">
+    <label asp-for="Name" class="form-label-app"></label>
+    <input asp-for="Name" class="form-input-app" placeholder="Ví dụ: Chuột gaming" />
+    <span asp-validation-for="Name" class="field-error"></span>
+</div>
+
+<div class="form-field">
+    <label asp-for="Description" class="form-label-app"></label>
+    <textarea asp-for="Description" class="form-textarea-app" placeholder="Mô tả ngắn gọn về sản phẩm (tùy chọn)"></textarea>
+    <span asp-validation-for="Description" class="field-error"></span>
+</div>
+
+<div class="row g-3">
+    <div class="col-sm-6 form-field">
+        <label asp-for="Price" class="form-label-app"></label>
+        <input asp-for="Price" class="form-input-app" type="number" step="1" min="0" />
+        <span asp-validation-for="Price" class="field-error"></span>
+    </div>
+    <div class="col-sm-6 form-field">
+        <label asp-for="Stock" class="form-label-app"></label>
+        <input asp-for="Stock" class="form-input-app" type="number" step="1" min="0" />
+        <span asp-validation-for="Stock" class="field-error"></span>
+    </div>
+</div>

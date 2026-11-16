@@ -1,0 +1,40 @@
+@model ProductManagerMvc.Models.Product
+
+@{
+    ViewData["Title"] = "Chi tiết sản phẩm";
+}
+
+<section class="page-card">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Chi tiết sản phẩm #@Model.Id</h1>
+            <p class="page-subtitle">Thông tin chi tiết được lấy từ EF Core theo Id.</p>
+        </div>
+        <a asp-action="Index" class="btn-app btn-app-outline">Quay lại danh sách</a>
+    </div>
+
+    <dl class="row mb-4">
+        <dt class="col-sm-3 text-secondary">Mã sản phẩm</dt>
+        <dd class="col-sm-9 fw-semibold">#@Model.Id</dd>
+
+        <dt class="col-sm-3 text-secondary">Tên sản phẩm</dt>
+        <dd class="col-sm-9 fw-bold">@Model.Name</dd>
+
+        <dt class="col-sm-3 text-secondary">Mô tả</dt>
+        <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.Description) ? "Chưa có mô tả" : Model.Description)</dd>
+
+        <dt class="col-sm-3 text-secondary">Giá bán</dt>
+        <dd class="col-sm-9 fw-semibold">@Model.Price.ToString("N0") VNĐ</dd>
+
+        <dt class="col-sm-3 text-secondary">Tồn kho</dt>
+        <dd class="col-sm-9">
+            <span class="stock-pill @(Model.Stock == 0 ? "stock-pill-zero" : "")">@Model.Stock sản phẩm</span>
+        </dd>
+    </dl>
+
+    <div class="d-flex flex-wrap gap-2">
+        <a asp-action="Edit" asp-route-id="@Model.Id" class="btn-app btn-app-primary">Sửa sản phẩm</a>
+        <a asp-action="Delete" asp-route-id="@Model.Id" class="btn-app btn-app-danger">Xóa</a>
+        <a asp-action="Index" class="btn-app btn-app-outline">Danh sách</a>
+    </div>
+</section>

@@ -1,0 +1,71 @@
+@model DependencyInjectionMvcDemo.Models.LifetimeComparisonViewModel
+
+@{
+    ViewData["Title"] = "So sánh Service Lifetimes";
+}
+
+<section class="page-card">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">So sánh Service Lifetimes bằng GUID</h1>
+            <p class="page-subtitle">
+                Mỗi marker sinh <code class="mono">Guid.NewGuid()</code> khi container khởi tạo instance.
+                So sánh 2 điểm inject trong cùng 1 HTTP request lúc <span class="mono">@Model.MeasuredAt.ToString("HH:mm:ss.fff")</span>.
+            </p>
+        </div>
+        <a asp-controller="Lifetime" asp-action="Index" class="btn-app btn-app-primary">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M20 20v-5h-5M5 9a7 7 0 0112.9-2M19 15a7 7 0 01-12.9 2" />
+            </svg>
+            <span>Refresh trang để kiểm chứng</span>
+        </a>
+    </div>
+
+    <div class="table-wrapper mb-4">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Lifetime</th>
+                    <th>Điểm inject 1 (Controller)</th>
+                    <th>Điểm inject 2 (LifetimeSnapshotService)</th>
+                    <th>Trong cùng 1 request</th>
+                    <th>Khi bấm Refresh (F5)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><span class="lifetime-badge badge-transient">Transient</span></td>
+                    <td><span class="guid-chip">@Model.ControllerTransientId</span></td>
+                    <td><span class="guid-chip">@Model.SnapshotTransientId</span></td>
+                    <td class="fw-semibold">
+                        @(Model.IsTransientSameInRequest ? "Giống nhau" : "Khác nhau (T1 != T2)")
+                    </td>
+                    <td>Tạo GUID mới cho mỗi lần resolve</td>
+                </tr>
+                <tr>
+                    <td><span class="lifetime-badge badge-scoped">Scoped</span></td>
+                    <td><span class="guid-chip">@Model.ControllerScopedId</span></td>
+                    <td><span class="guid-chip">@Model.SnapshotScopedId</span></td>
+                    <td class="fw-semibold">
+                        @(Model.IsScopedSameInRequest ? "Giống nhau (S1 = S2)" : "Khác nhau")
+                    </td>
+                    <td>Đổi sang GUID mới ở request tiếp theo</td>
+                </tr>
+                <tr>
+                    <td><span class="lifetime-badge badge-singleton">Singleton</span></td>
+                    <td><span class="guid-chip">@Model.ControllerSingletonId</span></td>
+                    <td><span class="guid-chip">@Model.SnapshotSingletonId</span></td>
+                    <td class="fw-semibold">
+                        @(Model.IsSingletonSameInRequest ? "Giống nhau (G1 = G2)" : "Khác nhau")
+                    </td>
+                    <td>Giữ nguyên GUID suốt thời gian app chạy</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="di-flow-strip mb-0">
+        <strong>Quy tắc nhớ nhanh:</strong>
+        <span>Transient: mỗi lần resolve tạo mới &middot; Scoped: dùng chung theo từng HTTP request (như EF Core DbContext) &middot; Singleton: dùng chung toàn app (không được giữ Scoped service bên trong).</span>
+    </div>
+</section>

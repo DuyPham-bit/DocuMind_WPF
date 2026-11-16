@@ -1,0 +1,26 @@
+@model DependencyInjectionMvcDemo.Models.Product
+
+<div class="mb-3">
+    <label asp-for="Name" class="form-label"></label>
+    <input asp-for="Name" class="form-control" placeholder="Ví dụ: Chuột không dây" />
+    <span asp-validation-for="Name" class="text-danger small"></span>
+</div>
+
+<div class="mb-3">
+    <label asp-for="Description" class="form-label"></label>
+    <textarea asp-for="Description" class="form-control" placeholder="Mô tả ngắn gọn về sản phẩm..."></textarea>
+    <span asp-validation-for="Description" class="text-danger small"></span>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-sm-6">
+        <label asp-for="Price" class="form-label"></label>
+        <input asp-for="Price" class="form-control" type="number" step="1000" min="1" />
+        <span asp-validation-for="Price" class="text-danger small"></span>
+    </div>
+    <div class="col-sm-6">
+        <label asp-for="Stock" class="form-label"></label>
+        <input asp-for="Stock" class="form-control" type="number" min="0" />
+        <span asp-validation-for="Stock" class="text-danger small"></span>
+    </div>
+</div>

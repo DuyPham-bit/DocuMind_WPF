@@ -1,0 +1,109 @@
+@model IReadOnlyList<DependencyInjectionMvcDemo.Models.Product>
+
+@{
+    ViewData["Title"] = "Danh sách sản phẩm";
+    string keyword = ViewData["Keyword"] as string ?? string.Empty;
+    string serviceImpl = ViewData["ServiceImplementation"] as string ?? nameof(DependencyInjectionMvcDemo.Services.ProductService);
+}
+
+<section class="page-card">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Danh sách sản phẩm</h1>
+            <p class="page-subtitle">Minh họa luồng Constructor Injection từ Controller đến Service và Repository.</p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a asp-controller="Lifetime" asp-action="Index" class="btn-app btn-app-outline">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>Xem Lifetime Demo</span>
+            </a>
+            <a asp-action="Create" class="btn-app btn-app-accent">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+                <span>Thêm sản phẩm</span>
+            </a>
+        </div>
+    </div>
+
+    <div class="di-flow-strip" aria-label="Luồng Dependency Injection">
+        <span class="text-secondary fw-semibold">Luồng DI đang chạy:</span>
+        <span class="di-node mono">ProductsController</span>
+        <span class="di-arrow" aria-hidden="true">-&gt;</span>
+        <span class="di-node mono">IProductService (@serviceImpl)</span>
+        <span class="di-arrow" aria-hidden="true">-&gt;</span>
+        <span class="di-node mono">IProductRepository (InMemoryProductRepository)</span>
+    </div>
+
+    <form method="get" asp-action="Index" class="search-bar" role="search">
+        <label for="searchKeyword" class="visually-hidden">Tìm sản phẩm theo tên hoặc mô tả</label>
+        <input id="searchKeyword"
+               type="search"
+               name="q"
+               value="@keyword"
+               class="search-input"
+               placeholder="Tìm theo tên hoặc mô tả sản phẩm..." />
+        <button type="submit" class="btn-app btn-app-primary">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35m1.35-5.15a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z" />
+            </svg>
+            <span>Tìm kiếm</span>
+        </button>
+        @if (!string.IsNullOrWhiteSpace(keyword))
+        {
+            <a asp-action="Index" class="btn-app btn-app-outline">Xóa lọc</a>
+        }
+    </form>
+
+    @if (Model.Count == 0)
+    {
+        <div class="p-4 text-center border rounded-3 bg-light">
+            <p class="mb-2 fw-semibold">Không tìm thấy sản phẩm nào phù hợp.</p>
+            <a asp-action="Create" class="btn-app btn-app-accent">Thêm sản phẩm mới</a>
+        </div>
+    }
+    else
+    {
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Tên sản phẩm</th>
+                        <th>Giá</th>
+                        <th>Tồn</th>
+                        <th>Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model)
+                    {
+                        <tr>
+                            <td class="mono fw-semibold">#@item.Id</td>
+                            <td>
+                                <div class="fw-bold">@item.Name</div>
+                                @if (!string.IsNullOrWhiteSpace(item.Description))
+                                {
+                                    <div class="small text-secondary">@item.Description</div>
+                                }
+                            </td>
+                            <td class="fw-semibold">@item.Price.ToString("N0") VNĐ</td>
+                            <td>
+                                <span class="stock-pill @(item.Stock == 0 ? "stock-pill-zero" : "")">@item.Stock</span>
+                            </td>
+                            <td>
+                                <div class="action-group">
+                                    <a asp-action="Details" asp-route-id="@item.Id" class="action-link">Xem</a>
+                                    <a asp-action="Edit" asp-route-id="@item.Id" class="action-link">Sửa</a>
+                                    <a asp-action="Delete" asp-route-id="@item.Id" class="action-link action-link-danger">Xóa</a>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>

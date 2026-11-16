@@ -1,0 +1,29 @@
+@model ProductManagerMvc.Models.Product
+
+@{
+    ViewData["Title"] = "Chỉnh sửa sản phẩm";
+}
+
+<section class="page-card">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Chỉnh sửa sản phẩm #@Model.Id</h1>
+            <p class="page-subtitle">Cập nhật thông tin sản phẩm và lưu xuống SQL Server.</p>
+        </div>
+        <a asp-action="Index" class="btn-app btn-app-outline">Quay lại danh sách</a>
+    </div>
+
+    <form asp-action="Edit" method="post" class="form-grid">
+        <input type="hidden" asp-for="Id" />
+        <partial name="_ProductFormFields" model="Model" />
+
+        <div class="d-flex flex-wrap gap-2 mt-2">
+            <button type="submit" class="btn-app btn-app-primary">Cập nhật</button>
+            <a asp-action="Index" class="btn-app btn-app-outline">Hủy</a>
+        </div>
+    </form>
+</section>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

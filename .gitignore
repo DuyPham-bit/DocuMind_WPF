@@ -379,3 +379,10 @@ appsettings.Development.json
 secrets.json
 .tools/
 *.db.backup*
+
+# Local SQLite databases & publish outputs
+*.db
+*.db-shm
+*.db-wal
+publish/
+
