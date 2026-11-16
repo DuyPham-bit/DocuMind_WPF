@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:DocuMind.WPF.Views"
         Title="DocuMind – Quiz ôn tập"
-        Height="720" Width="960" MinHeight="520" MinWidth="760"
+        Height="800" Width="960" MinHeight="620" MinWidth="760"
         WindowStartupLocation="CenterOwner"
         Background="#F8FAFC"
         FontFamily="Segoe UI, Tahoma, sans-serif">
@@ -41,6 +41,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
@@ -56,17 +57,47 @@
             <DockPanel>
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
                     <TextBlock Text="Số câu:" VerticalAlignment="Center" Margin="12,0,6,0" Foreground="#475569"/>
-                    <ComboBox x:Name="CountBox" ItemsSource="{Binding QuestionCounts}" SelectedItem="{Binding QuestionCount}" Width="60" Height="30" Margin="0,0,10,0"/>
+                    <ComboBox x:Name="CountBox" ItemsSource="{Binding QuestionCounts}" SelectedItem="{Binding QuestionCount}" IsEnabled="{Binding IsSelectionEditable}" Width="60" Height="30" Margin="0,0,10,0"/>
                     <Button Content="✨ Tạo quiz" Command="{Binding GenerateCommand}" Style="{StaticResource PrimaryBtn}"/>
                 </StackPanel>
                 <TextBlock Text="Chủ đề:" VerticalAlignment="Center" Margin="0,0,8,0" Foreground="#475569" DockPanel.Dock="Left"/>
                 <TextBox x:Name="TopicBox" Text="{Binding Topic, UpdateSourceTrigger=PropertyChanged}" Height="30" VerticalContentAlignment="Center"
-                         ToolTip="Ví dụ: Dependency Injection, vòng đời DbContext... Để trống để ôn toàn bộ tài liệu"/>
+                         IsEnabled="{Binding IsSelectionEditable}"
+                         ToolTip="Ví dụ: Dependency Injection, vòng đời DbContext... Để trống để lấy mẫu trong các tài liệu đã chọn"/>
             </DockPanel>
         </Border>
 
+        <!-- Source documents -->
+        <Border x:Name="DocumentPicker" Grid.Row="2" Grid.ColumnSpan="2" Background="White" BorderBrush="#E2E8F0" BorderThickness="1"
+                CornerRadius="10" Padding="12" Margin="0,0,0,12" IsEnabled="{Binding IsSelectionEditable}">
+            <StackPanel>
+                <DockPanel Margin="0,0,0,6">
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                        <Button Content="Chọn tất cả" Command="{Binding SelectAllDocumentsCommand}" Padding="8,3" Margin="0,0,8,0"/>
+                        <Button Content="Bỏ chọn" Command="{Binding ClearDocumentSelectionCommand}" Padding="8,3"/>
+                    </StackPanel>
+                    <TextBlock Text="Tài liệu làm quiz" FontWeight="SemiBold" Foreground="#0F172A" VerticalAlignment="Center"/>
+                </DockPanel>
+                <TextBlock Text="{Binding DocumentSelectionSummary}" Foreground="#64748B" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                <ScrollViewer MaxHeight="100" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <ItemsControl x:Name="DocumentList" ItemsSource="{Binding Documents}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <DockPanel Margin="0,3">
+                                    <TextBlock DockPanel.Dock="Right" Text="{Binding StatusLabel}" FontSize="11" Foreground="#64748B" Margin="12,0,0,0" VerticalAlignment="Center"/>
+                                    <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" IsEnabled="{Binding IsAvailable}" ToolTip="{Binding SourcePath}" VerticalContentAlignment="Center">
+                                        <TextBlock Text="{Binding Name}" TextWrapping="Wrap" Foreground="#1E293B"/>
+                                    </CheckBox>
+                                </DockPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </StackPanel>
+        </Border>
+
         <!-- Questions -->
-        <ScrollViewer Grid.Row="2" Grid.Column="0" VerticalScrollBarVisibility="Auto">
+        <ScrollViewer x:Name="QuestionScroll" Grid.Row="3" Grid.Column="0" VerticalScrollBarVisibility="Auto">
             <ItemsControl x:Name="QuestionList" ItemsSource="{Binding Questions}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
@@ -110,7 +141,7 @@
         </ScrollViewer>
 
         <!-- History -->
-        <Border Grid.Row="2" Grid.Column="1" Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="10" Padding="10">
+        <Border Grid.Row="3" Grid.Column="1" Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="10" Padding="10">
             <DockPanel>
                 <TextBlock DockPanel.Dock="Top" Text="LỊCH SỬ ÔN TẬP" FontSize="11" FontWeight="Bold" Foreground="#64748B" Margin="0,0,0,6"/>
                 <ListBox x:Name="HistoryList" ItemsSource="{Binding History}" DisplayMemberPath="Label" BorderThickness="0" FontSize="12"
@@ -119,7 +150,7 @@
         </Border>
 
         <!-- Footer -->
-        <DockPanel Grid.Row="3" Grid.ColumnSpan="2" Margin="0,12,0,0">
+        <DockPanel Grid.Row="4" Grid.ColumnSpan="2" Margin="0,12,0,0">
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                 <Button Content="Hủy" Command="{Binding CancelCommand}" Height="34" Padding="12,0" Margin="0,0,8,0"
                         Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}"/>

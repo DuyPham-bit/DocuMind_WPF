@@ -23,9 +23,9 @@ public sealed class OpenAiCompatibleService : IChatCompletionService, IEmbedding
         _endpoint = ChatProviderFactory.EffectiveEndpoint(providerType, baseUrl);
     }
 
-    private HttpRequestMessage Request(string route, object payload)
+    private HttpRequestMessage Request(string route, object payload, string? endpoint = null)
     {
-        var request = new HttpRequestMessage(HttpMethod.Post, $"{_endpoint}/{route}") { Content = JsonContent.Create(payload) };
+        var request = new HttpRequestMessage(HttpMethod.Post, $"{endpoint ?? _endpoint}/{route}") { Content = JsonContent.Create(payload) };
         if (!string.IsNullOrWhiteSpace(_key)) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _key);
         return request;
     }
@@ -36,6 +36,20 @@ public sealed class OpenAiCompatibleService : IChatCompletionService, IEmbedding
         var messages = new List<object> { new { role = "system", content = systemPrompt } };
         if (history != null) messages.AddRange(history.Select(t => (object)new { role = t.Role, content = t.Content }));
         messages.Add(new { role = "user", content = userPrompt });
+        if (ProviderType == AiProviderType.OllamaLocal)
+        {
+            // The OpenAI-compatible route cannot set num_ctx. Use Ollama's native chat
+            // route so every request gets the larger context without restarting its server.
+            var endpoint = _endpoint.EndsWith("/v1", StringComparison.OrdinalIgnoreCase) ? _endpoint[..^3] : _endpoint;
+            using var localResponse = await ProviderHttp.SendAsync(_http,
+                () => Request("api/chat", new
+                {
+                    model = _chatModel, messages, stream = false,
+                    options = new { num_ctx = 8192, num_predict = 3072, temperature }
+                }, endpoint), false, ct);
+            using var localDoc = await JsonDocument.ParseAsync(await localResponse.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+            return localDoc.RootElement.GetProperty("message").GetProperty("content").GetString() ?? "";
+        }
         using var response = await ProviderHttp.SendAsync(_http,
             () => Request("chat/completions", new { model = _chatModel, messages, temperature }), false, ct);
         using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);

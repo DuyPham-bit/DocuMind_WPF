@@ -121,7 +121,7 @@ public partial class SettingsViewModel(IChatProviderFactory providerFactory) : O
         var draft = CaptureDraft();
         var generation = _generation;
         IsBusy = true; IsSuccessStatus = false; StatusMessage = AppText.T("Testing the draft configuration…", "Đang kiểm tra cấu hình nháp…");
-        using var operation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var operation = new CancellationTokenSource(TimeSpan.FromMinutes(2));
         _operation = operation;
         try
         {

@@ -44,6 +44,12 @@ Mở **Cài đặt API Key & Nền tảng**, chọn:
 
 Bấm **Kiểm tra kết nối**, **Kiểm tra embedding**, sau đó **Lưu cấu hình**. Lần đầu tải model vào RAM/VRAM có thể lâu hơn. Kiểm tra chưa lưu cấu hình; cần bấm Lưu.
 
+### Giới hạn ngữ cảnh và thời gian chờ
+
+Chat Ollama dùng API native `/api/chat` với `options.num_ctx = 8192` và tối đa `3072` token sinh ra mỗi câu trả lời. App tự gửi giới hạn này theo request, không cần đặt lại biến môi trường hay khởi động lại Ollama để tăng từ 4096 lên 8192. Giữ Base URL dạng `http://localhost:11434/v1`: embedding vẫn gọi `/v1/embeddings`, không thay model hoặc profile index đã lưu. Proxy Ollama tùy chỉnh cần chuyển tiếp cả `/api/chat` và `/v1/embeddings` (giữ nguyên prefix trước `/v1` nếu có).
+
+HTTP, thao tác chat và tạo quiz có giới hạn chờ 10 phút; test kết nối/embedding có 2 phút; nạp tài liệu vẫn 10 phút/file. Nút Hủy tiếp tục hoạt động. Chat RAG giữ nguyên dấu tiếng Việt trong JSON ngữ cảnh để giảm token bị lãng phí bởi chuỗi `\\u...`. Tổng prompt, lịch sử và câu trả lời vẫn phải vừa 8192 token; đây không phải giới hạn vô hạn. Giảm số câu quiz hoặc chọn New chat nếu lượt làm việc quá dài. Context lớn hơn dùng thêm RAM/VRAM. Các thay đổi chỉ có hiệu lực sau khi build và mở lại DocuMind.
+
 ## 3. Re-index và kiểm tra
 
 Sau khi đổi embedding, dùng **Nạp tài liệu** chọn lại đúng file nguồn cũ trong từng workspace. Không cần xóa tài liệu: app tạo phiên bản mới và chỉ kích hoạt sau khi hoàn tất, giữ index cũ nếu thất bại. File nguồn đã di chuyển cần chọn lại vị trí mới.
