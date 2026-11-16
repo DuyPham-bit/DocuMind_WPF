@@ -231,20 +231,58 @@
                                                 </Border>
                                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                                     <TextBlock Text="{Binding DisplayName}" ToolTip="{Binding SourcePath}" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource InkPrimaryBrush}" TextTrimming="CharacterEllipsis"/>
-                                                    <TextBlock FontSize="9.5" FontWeight="SemiBold" Margin="0,2,0,0" TextTrimming="CharacterEllipsis">
+                                                    <!-- Ready / Indexing: chỉ là nhãn -->
+                                                    <TextBlock x:Name="DocStatusText" FontSize="9.5" FontWeight="SemiBold" Margin="0,2,0,0" TextTrimming="CharacterEllipsis">
                                                         <TextBlock.Style>
                                                             <Style TargetType="TextBlock">
                                                                 <Setter Property="Text" Value="{Binding Source={x:Static loc:UiText.Current}, Path=DocIndexedLabel}"/>
                                                                 <Setter Property="Foreground" Value="#047857"/>
                                                                 <Style.Triggers>
-                                                                    <DataTrigger Binding="{Binding NeedsReindex}" Value="True">
-                                                                        <Setter Property="Text" Value="{Binding Source={x:Static loc:UiText.Current}, Path=DocPendingLabel}"/>
-                                                                        <Setter Property="Foreground" Value="#B45309"/>
+                                                                    <DataTrigger Binding="{Binding IndexState}" Value="Indexing">
+                                                                        <Setter Property="Text" Value="{Binding Source={x:Static loc:UiText.Current}, Path=DocIndexingLabel}"/>
+                                                                        <Setter Property="Foreground" Value="#7B6A56"/>
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding CanReindex}" Value="True">
+                                                                        <Setter Property="Visibility" Value="Collapsed"/>
                                                                     </DataTrigger>
                                                                 </Style.Triggers>
                                                             </Style>
                                                         </TextBlock.Style>
                                                     </TextBlock>
+                                                    <!-- NeedsReindex / Failed: nhãn bấm được để nạp lại từ file gốc -->
+                                                    <Button x:Name="DocReindexButton"
+                                                            Command="{Binding DataContext.ReindexDocumentCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                            CommandParameter="{Binding}"
+                                                            ToolTip="{Binding Source={x:Static loc:UiText.Current}, Path=ReindexTooltip}"
+                                                            HorizontalAlignment="Left" Margin="0,2,0,0" Padding="0" Cursor="Hand"
+                                                            Background="Transparent" BorderThickness="0" FontSize="9.5" FontWeight="SemiBold">
+                                                        <Button.Style>
+                                                            <Style TargetType="Button">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                <Setter Property="Foreground" Value="#B45309"/>
+                                                                <Setter Property="Content" Value="{Binding Source={x:Static loc:UiText.Current}, Path=DocPendingLabel}"/>
+                                                                <Setter Property="Template">
+                                                                    <Setter.Value>
+                                                                        <ControlTemplate TargetType="Button">
+                                                                            <TextBlock Text="{TemplateBinding Content}" TextDecorations="Underline" TextTrimming="CharacterEllipsis"/>
+                                                                        </ControlTemplate>
+                                                                    </Setter.Value>
+                                                                </Setter>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding CanReindex}" Value="True">
+                                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding IndexState}" Value="Failed">
+                                                                        <Setter Property="Content" Value="{Binding Source={x:Static loc:UiText.Current}, Path=DocFailedLabel}"/>
+                                                                        <Setter Property="Foreground" Value="#B91C1C"/>
+                                                                    </DataTrigger>
+                                                                    <Trigger Property="IsEnabled" Value="False">
+                                                                        <Setter Property="Opacity" Value="0.55"/>
+                                                                    </Trigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Button.Style>
+                                                    </Button>
                                                 </StackPanel>
                                                 <Button Grid.Column="2" Content="×"
                                                         Command="{Binding DataContext.DeleteDocumentCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"

@@ -80,16 +80,30 @@ public sealed class EfDocumentStore(IDbContextFactory<AppDbContext> contexts) : 
     {
         await using var db = await contexts.CreateDbContextAsync(ct);
         var documents = db.Documents.AsNoTracking().Where(d => d.WorkspaceId == workspaceId).OrderBy(d => d.DisplayName);
-        if (current == null)
-            return await documents.Select(d => new DocumentListItem(d.Id, d.DisplayName, d.SourcePath,
-                !d.Versions.Any(v => v.Status == DocumentVersionStatus.Ready))).ToListAsync(ct);
         // Same profile match as GetCompatibleChunksAsync (dimension is fixed per model), so a document marked
         // ready here is one RAG can actually cite with the current embedding provider.
-        return await documents.Select(d => new DocumentListItem(d.Id, d.DisplayName, d.SourcePath,
-            !d.Versions.Any(v => v.Status == DocumentVersionStatus.Ready && v.EmbeddingProfile != null &&
-                v.EmbeddingProfile.Provider == current.Provider && v.EmbeddingProfile.Model == current.Model &&
-                v.EmbeddingProfile.Endpoint == current.Endpoint && v.EmbeddingProfile.Normalization == EmbeddingSession.Normalization &&
-                v.EmbeddingProfile.PipelineVersion == EmbeddingSession.PipelineVersion))).ToListAsync(ct);
+        // Plain locals so EF never dereferences a null session while building query parameters.
+        var provider = current?.Provider; var model = current?.Model ?? ""; var endpoint = current?.Endpoint ?? "";
+        var rows = await documents.Select(d => new
+        {
+            d.Id, d.DisplayName, d.SourcePath,
+            HasReady = d.Versions.Any(v => v.Status == DocumentVersionStatus.Ready),
+            HasCompatibleReady = d.Versions.Any(v => v.Status == DocumentVersionStatus.Ready && v.EmbeddingProfile != null &&
+                v.EmbeddingProfile.Provider == provider && v.EmbeddingProfile.Model == model &&
+                v.EmbeddingProfile.Endpoint == endpoint && v.EmbeddingProfile.Normalization == EmbeddingSession.Normalization &&
+                v.EmbeddingProfile.PipelineVersion == EmbeddingSession.PipelineVersion),
+            Latest = d.Versions.OrderByDescending(v => v.IndexedAt).Select(v => (DocumentVersionStatus?)v.Status).FirstOrDefault()
+        }).ToListAsync(ct);
+        return rows.Select(r =>
+        {
+            var usable = current == null ? r.HasReady : r.HasCompatibleReady;
+            // A Ready version always wins: a failed re-index keeps the old index usable, so it is not reported as failed.
+            var state = usable ? DocumentIndexState.Ready
+                : r.HasReady ? DocumentIndexState.NeedsReindex
+                : r.Latest == DocumentVersionStatus.Staging ? DocumentIndexState.Indexing
+                : DocumentIndexState.Failed;
+            return new DocumentListItem(r.Id, r.DisplayName, r.SourcePath, !usable, state);
+        }).ToList();
     }
 
     public async Task DeleteAsync(Guid workspaceId, Guid documentId, CancellationToken ct = default)

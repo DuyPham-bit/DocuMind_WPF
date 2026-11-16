@@ -3,8 +3,24 @@ using DocuMind.Domain.Entities;
 
 namespace DocuMind.Application.Interfaces;
 
-public record DocumentListItem(Guid Id, string DisplayName, string SourcePath, bool NeedsReindex = false)
+/// <summary>Trạng thái index của một tài liệu đối với profile embedding hiện tại, dùng để hiển thị nhãn trên UI.</summary>
+public enum DocumentIndexState
 {
+    /// <summary>Có bản Ready khớp profile embedding hiện tại: RAG/Quiz dùng được.</summary>
+    Ready,
+    /// <summary>Có bản Ready nhưng của profile embedding khác (đổi model/provider): cần nạp lại.</summary>
+    NeedsReindex,
+    /// <summary>Không có bản Ready, lần nạp gần nhất bị lỗi hoặc bị hủy.</summary>
+    Failed,
+    /// <summary>Không có bản Ready, đang có lần nạp chưa xong.</summary>
+    Indexing
+}
+
+public record DocumentListItem(Guid Id, string DisplayName, string SourcePath, bool NeedsReindex = false, DocumentIndexState? State = null)
+{
+    /// <summary>Khi store không chỉ rõ trạng thái thì suy ra từ NeedsReindex (tương thích các store/test cũ).</summary>
+    public DocumentIndexState IndexState => State ?? (NeedsReindex ? DocumentIndexState.NeedsReindex : DocumentIndexState.Ready);
+    public bool CanReindex => IndexState is DocumentIndexState.NeedsReindex or DocumentIndexState.Failed;
     public string Label => NeedsReindex ? DisplayName + " (re-index required)" : DisplayName;
     public override string ToString() => Label;
 }
