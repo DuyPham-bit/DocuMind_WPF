@@ -63,8 +63,9 @@ public partial class App : System.Windows.Application
 
         try
         {
+            DocuMind.WPF.Localization.UiText.Current.EnablePersistence(DocuMind.WPF.Localization.UiText.DefaultSettingsPath);
             _instanceMutex = new Mutex(true, "Local\\DocuMind-" + Environment.UserName, out var ownsInstance);
-            if (!ownsInstance) { MessageBox.Show("DocuMind is already running in another window."); Shutdown(); return; }
+            if (!ownsInstance) { MessageBox.Show(AppText.T("DocuMind is already running in another window.", "DocuMind đang chạy ở một cửa sổ khác.")); Shutdown(); return; }
             using (var scope = Services.CreateScope())
             {
                 var factory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>();
@@ -78,8 +79,9 @@ public partial class App : System.Windows.Application
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"The application could not start: {UserErrors.Describe(ex)}\nDatabase and backups: {Path.GetDirectoryName(DatabaseMaintenance.DefaultPath)}",
-                "DocuMind — Startup error", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(AppText.T($"The application could not start: {UserErrors.Describe(ex)}\nDatabase and backups: {Path.GetDirectoryName(DatabaseMaintenance.DefaultPath)}",
+                $"Không khởi động được ứng dụng: {UserErrors.Describe(ex)}\nDatabase và bản sao lưu: {Path.GetDirectoryName(DatabaseMaintenance.DefaultPath)}"),
+                AppText.T("DocuMind — Startup error", "DocuMind — Lỗi khởi động"), MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown(1);
         }
     }

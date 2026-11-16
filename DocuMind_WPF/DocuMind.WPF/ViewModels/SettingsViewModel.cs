@@ -79,7 +79,7 @@ public partial class SettingsViewModel(IChatProviderFactory providerFactory) : O
         var generation = ++_generation;
         _operation?.Cancel();
         ApiKey = ""; ChatModel = ""; EmbeddingModel = ""; BaseUrl = ""; Temperature = 0.7; UseForEmbedding = false;
-        IsLoading = true; IsSuccessStatus = false; StatusMessage = "Loading provider settings…";
+        IsLoading = true; IsSuccessStatus = false; StatusMessage = AppText.T("Loading provider settings…", "Đang tải cấu hình provider…");
         try
         {
             var draft = await providerFactory.LoadDraftAsync(provider);
@@ -88,14 +88,14 @@ public partial class SettingsViewModel(IChatProviderFactory providerFactory) : O
             _activeEmbeddingProvider = activeEmbedding?.ProviderType;
             ApiKey = draft.ApiKey; ChatModel = draft.ChatModel; EmbeddingModel = draft.EmbeddingModel;
             BaseUrl = draft.BaseUrl; Temperature = draft.Temperature; UseForEmbedding = draft.UseForEmbedding;
-            StatusMessage = draft.KeyNeedsReplacement ? "The stored key cannot be decrypted for this Windows user. Enter a replacement key and save; your other settings were preserved."
-                : provider == AiProviderType.OpenRouter ? "Paste an OpenRouter API key, test the connection and embeddings, then save. Free models have rate limits."
-                : "This is a draft. Tests do not save changes; saving activates the chat provider.";
+            StatusMessage = draft.KeyNeedsReplacement ? AppText.T("The stored key cannot be decrypted for this Windows user. Enter a replacement key and save; your other settings were preserved.", "Không giải mã được key đã lưu cho tài khoản Windows này. Hãy nhập key mới rồi lưu; các cài đặt khác vẫn được giữ.")
+                : provider == AiProviderType.OpenRouter ? AppText.T("Paste an OpenRouter API key, test the connection and embeddings, then save. Free models have rate limits.", "Dán API key OpenRouter, kiểm tra kết nối và embedding rồi lưu. Model miễn phí có giới hạn số lượt gọi.")
+                : AppText.T("This is a draft. Tests do not save changes; saving activates the chat provider.", "Đây là bản nháp. Kiểm tra không lưu thay đổi; bấm lưu sẽ kích hoạt provider chat.");
             if (EmbeddingSwitchWarning() is { } warning) StatusMessage += " " + warning;
         }
         catch (Exception ex)
         {
-            if (generation == _generation) StatusMessage = UserErrors.Describe(ex) + " If the saved key cannot be decrypted, enter a replacement and save.";
+            if (generation == _generation) StatusMessage = UserErrors.Describe(ex) + AppText.T(" If the saved key cannot be decrypted, enter a replacement and save.", " Nếu không giải mã được key đã lưu, hãy nhập key mới rồi lưu.");
         }
         finally { if (generation == _generation) IsLoading = false; }
     }
@@ -108,7 +108,8 @@ public partial class SettingsViewModel(IChatProviderFactory providerFactory) : O
     // Moving embeddings to another provider makes every existing index unusable for RAG until it is rebuilt.
     public string? EmbeddingSwitchWarning() =>
         UseForEmbedding && _activeEmbeddingProvider is { } current && current != SelectedProvider
-            ? $"Saving moves document embeddings from {current} to {SelectedProvider}. Documents in the open workspace are re-indexed automatically after saving; other workspaces show \"Pending · Re-index\" until you upload their files again."
+            ? AppText.T($"Saving moves document embeddings from {current} to {SelectedProvider}. Documents in the open workspace are re-indexed automatically after saving; other workspaces show \"Pending · Re-index\" until you upload their files again.",
+                $"Lưu sẽ chuyển embedding tài liệu từ {current} sang {SelectedProvider}. Tài liệu trong workspace đang mở sẽ tự được nạp lại sau khi lưu; các workspace khác hiện \"Chờ nạp lại\" cho tới khi bạn nạp lại file.")
             : null;
 
     [RelayCommand(CanExecute = nameof(IsEditable))]
@@ -119,7 +120,7 @@ public partial class SettingsViewModel(IChatProviderFactory providerFactory) : O
     {
         var draft = CaptureDraft();
         var generation = _generation;
-        IsBusy = true; IsSuccessStatus = false; StatusMessage = "Testing the draft configuration…";
+        IsBusy = true; IsSuccessStatus = false; StatusMessage = AppText.T("Testing the draft configuration…", "Đang kiểm tra cấu hình nháp…");
         using var operation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         _operation = operation;
         try
@@ -129,7 +130,7 @@ public partial class SettingsViewModel(IChatProviderFactory providerFactory) : O
                 : await providerFactory.CreateTemporary(draft).TestConnectionAsync(operation.Token);
             if (generation != _generation) return;
             IsSuccessStatus = ok;
-            StatusMessage = ok ? "Connection successful. Your configuration has not been saved yet." : "No valid response was received. Your configuration has not been saved.";
+            StatusMessage = ok ? AppText.T("Connection successful. Your configuration has not been saved yet.", "Kết nối thành công. Cấu hình của bạn chưa được lưu.") : AppText.T("No valid response was received. Your configuration has not been saved.", "Không nhận được phản hồi hợp lệ. Cấu hình của bạn chưa được lưu.");
         }
         catch (Exception ex) { if (generation == _generation) StatusMessage = UserErrors.Describe(ex); }
         finally { _operation = null; IsBusy = false; }
@@ -147,7 +148,7 @@ public partial class SettingsViewModel(IChatProviderFactory providerFactory) : O
         {
             await providerFactory.SaveAsync(draft);
             SavedSuccessfully = true;
-            IsSuccessStatus = true; StatusMessage = "Provider settings saved.";
+            IsSuccessStatus = true; StatusMessage = AppText.T("Provider settings saved.", "Đã lưu cấu hình provider.");
             CloseAction?.Invoke();
         }
         catch (Exception ex) { StatusMessage = UserErrors.Describe(ex); }
