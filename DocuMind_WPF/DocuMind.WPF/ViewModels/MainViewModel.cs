@@ -78,7 +78,7 @@ public partial class MainViewModel : ObservableObject
     private void RefreshCommands()
     {
         OnPropertyChanged(nameof(CanWork));
-        UploadDocumentCommand.NotifyCanExecuteChanged(); DeleteDocumentCommand.NotifyCanExecuteChanged();
+        UploadDocumentCommand.NotifyCanExecuteChanged(); DeleteDocumentCommand.NotifyCanExecuteChanged(); ReindexDocumentCommand.NotifyCanExecuteChanged();
         SendMessageCommand.NotifyCanExecuteChanged(); ClearChatCommand.NotifyCanExecuteChanged();
         OpenConversationCommand.NotifyCanExecuteChanged(); DeleteConversationCommand.NotifyCanExecuteChanged();
         CreateWorkspaceCommand.NotifyCanExecuteChanged(); SaveWorkspaceCommand.NotifyCanExecuteChanged(); DeleteWorkspaceCommand.NotifyCanExecuteChanged();
@@ -209,6 +209,20 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand] private void Cancel() => _operation?.Cancel();
+
+    /// <summary>Nạp lại một tài liệu từ đường dẫn gốc (khi nạp lỗi hoặc đã đổi model embedding).</summary>
+    [RelayCommand(CanExecute = nameof(CanWork))]
+    private async Task ReindexDocumentAsync(DocumentListItem? document)
+    {
+        if (document == null || SelectedWorkspace == null) return;
+        if (string.IsNullOrWhiteSpace(document.SourcePath) || !File.Exists(document.SourcePath))
+        {
+            BusyStatus = AppText.T($"Original file not found: {document.SourcePath}. Upload it again from its new location.",
+                $"Không tìm thấy file gốc: {document.SourcePath}. Hãy nạp lại từ vị trí mới.");
+            return;
+        }
+        await IngestFilesAsync([document.SourcePath]);
+    }
 
     [RelayCommand(CanExecute = nameof(CanWork))]
     private async Task DeleteDocumentAsync(DocumentListItem? document)

@@ -71,7 +71,7 @@ dotnet test DocuMind.slnx --no-build
 dotnet run --project DocuMind.WPF
 ```
 
-Kết quả mong đợi: build 0 warning, 0 error; toàn bộ test pass (111 test tại thời điểm viết, ngày 17/11/2026). Test dùng AI/HTTP giả và SQLite tạm nên không cần API key và không gọi API thật.
+Kết quả mong đợi: build 0 warning, 0 error; toàn bộ test pass (116 test tại thời điểm viết, ngày 17/11/2026). Test dùng AI/HTTP giả và SQLite tạm nên không cần API key và không gọi API thật.
 
 ### 3.3 Dữ liệu nằm ở đâu
 
@@ -121,7 +121,7 @@ Base URL kết thúc ở `/v1` (Gemini là `/v1beta`), không thêm `/chat/compl
 ### 4.4 Hoán chuyển nền tảng và bảo vệ key
 
 - **Chat và embedding là hai vai trò riêng.** Ví dụ chat bằng Groq nhưng embedding bằng Ollama: lưu Ollama với tick embedding trước, sau đó lưu Groq **không** tick, provider embedding cũ vẫn được giữ.
-- Đổi provider/model **chat** không ảnh hưởng tài liệu đã nạp. Đổi provider/model/URL **embedding** thì phải nạp lại tài liệu: file cũ hiện **Pending · Re-index** và không được dùng làm nguồn cho tới khi nạp lại, vì vector của hai model khác nhau không so sánh được.
+- Đổi provider/model **chat** không ảnh hưởng tài liệu đã nạp. Đổi provider/model/URL **embedding** thì phải nạp lại tài liệu: file cũ hiện **Embedding changed · Re-index ↻** và không được dùng làm nguồn cho tới khi nạp lại (bấm vào nhãn đó để nạp lại), vì vector của hai model khác nhau không so sánh được.
 - Key được mã hóa bằng **Windows DPAPI (CurrentUser)** trước khi lưu DB, chỉ đúng tài khoản Windows đó giải mã được. Mã hóa lỗi thì app báo lỗi và không lưu. Chuyển máy hoặc tài khoản thì nhập lại key. Không đưa key vào source, ảnh chụp màn hình hay script SQL.
 
 ---
@@ -132,6 +132,8 @@ Nút **EN / VI** đổi toàn bộ giao diện chính giữa tiếng Anh và ti�
 
 1. **Workspace (mỗi môn một workspace):** chọn ở dropdown **WORKSPACE**; mở **Workspace settings** để sửa **NAME**, **SYSTEM INSTRUCTION** rồi **Save**, hoặc **New** / **Delete**. Xóa workspace sẽ xóa luôn tài liệu, index, lịch sử chat và lịch sử quiz của workspace đó (có hộp xác nhận).
 2. **Nạp tài liệu:** **＋ Upload documents** (*Nạp tài liệu*), chọn một hoặc nhiều file `.pdf`, `.txt`, `.md`. Trạng thái hiện tiến độ từng đoạn; bấm **Cancel** để dừng. Nạp lại cùng file chỉ thay bản cũ khi bản mới hoàn tất, lỗi giữa chừng thì bản cũ vẫn dùng được. PDF scan dạng ảnh cần OCR trước.
+   - Nhãn dưới tên file: **Indexed · Ready** (*Đã nạp · Sẵn sàng*) là dùng được; **Indexing…** là đang nạp; **Index failed · Retry ↻** (*Nạp lỗi · Thử lại*) là lần nạp bị lỗi hoặc bị hủy; **Embedding changed · Re-index ↻** là file được nạp bằng model embedding khác.
+   - Hai nhãn có ↻ bấm được: app nạp lại file từ đường dẫn gốc. Nếu file đã bị di chuyển hoặc xóa, app báo và bạn dùng **Upload documents** để chọn lại.
 3. **Chat ra ngoài:** tắt **Search documents** (*Tra cứu tài liệu (RAG)*), gõ câu hỏi, **Enter** để gửi, **Shift + Enter** để xuống dòng. Câu hỏi đi kèm system instruction và các lượt chat gần nhất cùng chế độ.
 4. **Chat RAG:** bật **Search documents**. Câu trả lời có khung **SOURCES** (file, trang, độ khớp); **Open source** mở file gốc, PDF mở bằng Microsoft Edge đúng trang. Nếu không có đoạn đủ liên quan, app nói rõ là không đủ căn cứ và không gọi AI.
 5. **Lịch sử hội thoại:** tab **HISTORY** ở thanh bên liệt kê các cuộc trò chuyện đã lưu của workspace; bấm để mở lại, nút xóa để xóa một cuộc. **New chat** (*Chat mới*) bắt đầu cuộc mới, không xóa cuộc cũ.
@@ -278,7 +280,8 @@ Bộ test bao phủ: chunking và cosine; DPAPI; migration DB cũ, backup/restor
 | Không mở được `.slnx` / không nhận `net10.0` | IDE hoặc SDK cũ | Cài .NET 10 SDK, cập nhật Visual Studio hoặc dùng CLI |
 | **Not configured** / yêu cầu mở Settings | Chưa lưu provider chat | **Manage providers** → Test → **Save provider** |
 | Báo chưa chọn provider embedding khi bật RAG/Quiz | Chưa bật vai trò embedding | Tick **Use this provider for document embeddings and RAG** và lưu |
-| File hiện **Pending · Re-index** hoặc RAG báo không đủ căn cứ | Đổi embedding model, index của bản cũ, hoặc PDF scan | Nạp lại file nguồn; PDF scan cần OCR |
+| File hiện **Index failed · Retry ↻** | Lần nạp bị lỗi (mạng, key, quota) hoặc bị hủy | Sửa nguyên nhân (thường là cấu hình provider) rồi bấm vào nhãn để nạp lại |
+| File hiện **Embedding changed · Re-index ↻** hoặc RAG báo không đủ căn cứ | Đổi embedding model, index của bản cũ, hoặc PDF scan | Bấm nhãn để nạp lại; PDF scan cần OCR |
 | HTTP 401/403 | Key sai, nhập nhầm provider, hết quyền model | Nhập lại key đúng provider |
 | HTTP 404 | Sai tên model hoặc Base URL | Đối chiếu tên model; URL kết thúc ở `/v1` |
 | HTTP 429 | Hết quota (model miễn phí) | Đợi, đổi model, hoặc dùng Ollama local |

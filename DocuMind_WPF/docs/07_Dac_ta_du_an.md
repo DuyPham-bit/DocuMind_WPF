@@ -68,6 +68,8 @@ CanWork bằng không IsBusy và không IsLoading. Upload, xóa tài liệu, g�
 
 Trong đợt rà soát cuối, vùng BusyStatus được đưa vào hàng bố cục riêng, có xuống dòng, xuất hiện khi có nội dung dù IsBusy đã false. Progress và Cancel chỉ hiện trong lúc bận. Nhờ đó lỗi HTTP, tệp nguồn mất hoặc tổng kết nạp tài liệu không biến mất ngay khi thao tác kết thúc. Vùng trạng thái rỗng được thu gọn.
 
+Mỗi tài liệu trong danh sách có một nhãn trạng thái so với profile embedding đang dùng (`DocumentListItem.IndexState`): **Indexed · Ready** khi có bản Ready khớp profile; **Indexing…** khi đang có bản Staging và chưa có Ready; **Index failed · Retry ↻** khi không có Ready và lần nạp gần nhất lỗi hoặc bị hủy; **Embedding changed · Re-index ↻** khi chỉ có Ready của profile khác. Có Ready khớp profile thì luôn hiện Ready, kể cả khi lần nạp lại sau đó lỗi, vì index cũ vẫn dùng được. Hai nhãn có ↻ là nút: bấm sẽ nạp lại tài liệu từ đường dẫn gốc qua `ReindexDocumentCommand`; nếu file gốc không còn, app báo lỗi và không gọi provider.
+
 SettingsDialog có provider, PasswordBox, giữ chuột để hiện key, chat model, temperature, embedding model, vai trò embedding, Base URL, test chat, test embedding, cancel và save. Khi đang tải hoặc kiểm tra, các trường chỉnh sửa bị khóa. Đóng Settings giữ MainWindow mở và refresh tên provider active.
 
 ## 5 Mô hình dữ liệu và quan hệ
@@ -330,7 +332,7 @@ EF CLI đã dùng trong đợt kiểm tra là 10.0.14. SQLite script hiện bao 
 
 ## 17 Kiểm thử và nghiệm thu cuối
 
-Đợt rà soát ngày 14 tháng 11 năm 2026 chạy 68 test và không có test bị bỏ qua. Test dùng SQLite thực trong fixture riêng, parser/provider/HTTP giả để tái hiện lỗi mà không tiêu key hoặc quota. WPF smoke chạy trên thread STA, mở/đóng main và Settings, kiểm tra PasswordBox và Markdown. Kiểm tra mới xác nhận BusyStatus vẫn thấy khi IsBusy false và nút Test embedding nằm trong viewport ở min width.
+Đợt rà soát ngày 14 tháng 11 năm 2026 chạy 68 test và không có test bị bỏ qua. Sau các PR Quiz, lịch sử hội thoại và trạng thái tài liệu, ngày 17 tháng 11 năm 2026 bộ test có 116 test, đều pass; số liệu cập nhật nằm trong `USER_GUIDE.md`. Test dùng SQLite thực trong fixture riêng, parser/provider/HTTP giả để tái hiện lỗi mà không tiêu key hoặc quota. WPF smoke chạy trên thread STA, mở/đóng main và Settings, kiểm tra PasswordBox và Markdown. Kiểm tra mới xác nhận BusyStatus vẫn thấy khi IsBusy false và nút Test embedding nằm trong viewport ở min width.
 
 | Nhóm | Bằng chứng cần giữ |
 | --- | --- |
@@ -350,7 +352,7 @@ Build và fake HTTP pass không xác nhận model cloud đang khả dụng hoặ
 
 Rà soát diff thay đổi giao diện gần nhất và các đường gọi hiện hành xác nhận hai lỗi cụ thể: BusyStatus chỉ hiện khi bận nên lỗi/tổng kết bị ẩn sau finally; SQLite script thiếu migration TranslateDefaultWorkspace nên DbCheck dừng ở kiểm tra all migrations applied. Hai lỗi đã được sửa trong đợt này và có kiểm tra tái hiện trước/sau. Chi tiết finding, lệnh xác minh và trạng thái nằm trong 08_Review_cuoi.md.
 
-Giới hạn còn lại cần hiểu khi nghiệm thu: cửa sổ history/export chưa gồm toàn bộ conversation; câu hỏi lỗi có thể chỉ còn bubble chưa lưu; chưa có xử lý riêng AI trả rỗng hoặc bị chặn; danh sách tài liệu xác định re-index required từ việc có Ready, chưa so profile active ngay trên nhãn; source path có thể trỏ đến file đã sửa; tóm tắt topK không bảo đảm toàn tài liệu. Đây là giới hạn hiện hành, không trình bày thành regression mới của thay đổi tài liệu.
+Giới hạn còn lại cần hiểu khi nghiệm thu: cửa sổ history/export chưa gồm toàn bộ conversation; câu hỏi lỗi có thể chỉ còn bubble chưa lưu; chưa có xử lý riêng AI trả rỗng hoặc bị chặn; source path có thể trỏ đến file đã sửa; tóm tắt topK không bảo đảm toàn tài liệu. Đây là giới hạn hiện hành, không trình bày thành regression mới của thay đổi tài liệu.
 
 Hướng phát triển có thể gồm màn hình chọn conversation và export toàn bộ; phân tách history hiển thị khỏi budget request; xử lý response rỗng; OCR/parser DOCX đúng cấu trúc; context budget cho cả câu hỏi và nguồn; tổng hợp toàn tài liệu; tôn trọng Retry-After; benchmark vector store và batch embedding; kiểm thử model thực bằng tập câu hỏi chuẩn. Mỗi hướng cần tiêu chí nghiệm thu và test riêng trước khi được ghi là tính năng hoàn thành.
 

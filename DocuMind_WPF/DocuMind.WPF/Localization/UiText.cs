@@ -80,7 +80,10 @@ public sealed partial class UiText : ObservableObject
     public string DeleteHistoryTooltip => IsVietnamese ? "Xóa cuộc trò chuyện" : "Delete conversation";
     public string MessagesSuffix => IsVietnamese ? "tin" : "msgs";
     public string DocIndexedLabel => IsVietnamese ? "Đã nạp · Sẵn sàng" : "Indexed · Ready";
-    public string DocPendingLabel => IsVietnamese ? "Chờ nạp lại" : "Pending · Re-index";
+    public string DocPendingLabel => IsVietnamese ? "Khác model embedding · Nạp lại ↻" : "Embedding changed · Re-index ↻";
+    public string DocFailedLabel => IsVietnamese ? "Nạp lỗi · Thử lại ↻" : "Index failed · Retry ↻";
+    public string DocIndexingLabel => IsVietnamese ? "Đang nạp…" : "Indexing…";
+    public string ReindexTooltip => IsVietnamese ? "Bấm để nạp lại tài liệu này từ file gốc" : "Click to index this document again from its original file";
     public string RemoveDocTooltip => IsVietnamese ? "Xóa tài liệu" : "Remove document";
     public string AiProviderHeader => IsVietnamese ? "NỀN TẢNG AI" : "AI PROVIDER";
     public string ManageProvidersButton => IsVietnamese ? "Cài đặt API & Model" : "Manage providers";
