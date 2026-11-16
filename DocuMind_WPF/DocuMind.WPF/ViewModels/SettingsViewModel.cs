@@ -27,6 +27,7 @@ public partial class SettingsViewModel(IChatProviderFactory providerFactory) : O
     [ObservableProperty] private bool _isSuccessStatus;
     public Action? CloseAction { get; set; }
     public bool SavedSuccessfully { get; private set; }
+    private AiProviderType? _activeEmbeddingProvider;
     public bool IsEditable => !IsBusy && !IsLoading;
     public ProviderConfigDraft CaptureDraft() => new(SelectedProvider, ApiKey, ChatModel, EmbeddingModel, BaseUrl, Temperature, UseForEmbedding);
 
@@ -82,12 +83,15 @@ public partial class SettingsViewModel(IChatProviderFactory providerFactory) : O
         try
         {
             var draft = await providerFactory.LoadDraftAsync(provider);
+            var activeEmbedding = await providerFactory.GetActiveEmbeddingSettingAsync();
             if (generation != _generation || provider != SelectedProvider) return;
+            _activeEmbeddingProvider = activeEmbedding?.ProviderType;
             ApiKey = draft.ApiKey; ChatModel = draft.ChatModel; EmbeddingModel = draft.EmbeddingModel;
             BaseUrl = draft.BaseUrl; Temperature = draft.Temperature; UseForEmbedding = draft.UseForEmbedding;
             StatusMessage = draft.KeyNeedsReplacement ? "The stored key cannot be decrypted for this Windows user. Enter a replacement key and save; your other settings were preserved."
                 : provider == AiProviderType.OpenRouter ? "Paste an OpenRouter API key, test the connection and embeddings, then save. Free models have rate limits."
                 : "This is a draft. Tests do not save changes; saving activates the chat provider.";
+            if (EmbeddingSwitchWarning() is { } warning) StatusMessage += " " + warning;
         }
         catch (Exception ex)
         {
@@ -95,6 +99,17 @@ public partial class SettingsViewModel(IChatProviderFactory providerFactory) : O
         }
         finally { if (generation == _generation) IsLoading = false; }
     }
+
+    partial void OnUseForEmbeddingChanged(bool value)
+    {
+        if (!IsLoading && EmbeddingSwitchWarning() is { } warning) { IsSuccessStatus = false; StatusMessage = warning; }
+    }
+
+    // Moving embeddings to another provider makes every existing index unusable for RAG until it is rebuilt.
+    public string? EmbeddingSwitchWarning() =>
+        UseForEmbedding && _activeEmbeddingProvider is { } current && current != SelectedProvider
+            ? $"Saving moves document embeddings from {current} to {SelectedProvider}. Documents in the open workspace are re-indexed automatically after saving; other workspaces show \"Pending · Re-index\" until you upload their files again."
+            : null;
 
     [RelayCommand(CanExecute = nameof(IsEditable))]
     private Task TestConnectionAsync() => RunTestAsync(false);

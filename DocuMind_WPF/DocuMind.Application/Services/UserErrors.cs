@@ -2,6 +2,9 @@ using System.Diagnostics;
 
 namespace DocuMind.Application.Services;
 
+// An error whose message is written for the user and contains no secrets, so it may be shown as-is.
+public sealed class UserFacingException(string message) : InvalidOperationException(message);
+
 public static class UserErrors
 {
     public static string Describe(Exception error)
@@ -10,6 +13,7 @@ public static class UserErrors
         Trace.TraceError("DocuMind operation failed: {0}", error.GetType().Name);
         return error switch
         {
+            UserFacingException userFacing => userFacing.Message,
             OperationCanceledException => "The operation was canceled or timed out. Existing saved data was kept.",
             HttpRequestException http when http.StatusCode != null => $"The AI provider returned HTTP {(int)http.StatusCode}. Check the key or model, then try again.",
             HttpRequestException => "Unable to reach the provider. Check your network connection and base URL.",

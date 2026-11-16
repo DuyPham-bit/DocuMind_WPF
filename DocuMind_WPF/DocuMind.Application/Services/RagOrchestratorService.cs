@@ -109,6 +109,12 @@ public sealed class RagOrchestratorService(IChatProviderFactory providers, IDocu
     }
 
     private static ChatResultDto NoSources() => new("There is not enough evidence in compatible documents to answer. Upload a document or re-index with the current embedding profile.", []);
-    public Task<List<DocumentListItem>> GetWorkspaceFilesAsync(Guid workspaceId, CancellationToken ct = default) => documents.ListAsync(workspaceId, ct);
+    public async Task<List<DocumentListItem>> GetWorkspaceFilesAsync(Guid workspaceId, CancellationToken ct = default)
+    {
+        EmbeddingSession? current;
+        try { current = await providers.GetEmbeddingSessionAsync(ct); }
+        catch (InvalidOperationException) { current = null; } // No usable embedding provider: fall back to the Ready status only.
+        return await documents.ListAsync(workspaceId, current, ct);
+    }
     public Task DeleteDocumentAsync(Guid workspaceId, Guid documentId, CancellationToken ct = default) => documents.DeleteAsync(workspaceId, documentId, ct);
 }

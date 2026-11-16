@@ -74,11 +74,22 @@ public sealed class EfDocumentStore(IDbContextFactory<AppDbContext> contexts) : 
             .OrderBy(c => c.DocumentVersionId).ThenBy(c => c.ChunkIndex).ToListAsync(ct);
     }
 
-    public async Task<List<DocumentListItem>> ListAsync(Guid workspaceId, CancellationToken ct = default)
+    public Task<List<DocumentListItem>> ListAsync(Guid workspaceId, CancellationToken ct = default) => ListAsync(workspaceId, null, ct);
+
+    public async Task<List<DocumentListItem>> ListAsync(Guid workspaceId, EmbeddingSession? current, CancellationToken ct = default)
     {
         await using var db = await contexts.CreateDbContextAsync(ct);
-        return await db.Documents.AsNoTracking().Where(d => d.WorkspaceId == workspaceId).OrderBy(d => d.DisplayName)
-            .Select(d => new DocumentListItem(d.Id, d.DisplayName, d.SourcePath, !d.Versions.Any(v => v.Status == DocumentVersionStatus.Ready))).ToListAsync(ct);
+        var documents = db.Documents.AsNoTracking().Where(d => d.WorkspaceId == workspaceId).OrderBy(d => d.DisplayName);
+        if (current == null)
+            return await documents.Select(d => new DocumentListItem(d.Id, d.DisplayName, d.SourcePath,
+                !d.Versions.Any(v => v.Status == DocumentVersionStatus.Ready))).ToListAsync(ct);
+        // Same profile match as GetCompatibleChunksAsync (dimension is fixed per model), so a document marked
+        // ready here is one RAG can actually cite with the current embedding provider.
+        return await documents.Select(d => new DocumentListItem(d.Id, d.DisplayName, d.SourcePath,
+            !d.Versions.Any(v => v.Status == DocumentVersionStatus.Ready && v.EmbeddingProfile != null &&
+                v.EmbeddingProfile.Provider == current.Provider && v.EmbeddingProfile.Model == current.Model &&
+                v.EmbeddingProfile.Endpoint == current.Endpoint && v.EmbeddingProfile.Normalization == EmbeddingSession.Normalization &&
+                v.EmbeddingProfile.PipelineVersion == EmbeddingSession.PipelineVersion))).ToListAsync(ct);
     }
 
     public async Task DeleteAsync(Guid workspaceId, Guid documentId, CancellationToken ct = default)

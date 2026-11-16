@@ -13,4 +13,5 @@ public interface IChatProviderFactory
     Task<ChatSession> GetChatSessionAsync(CancellationToken ct = default);
     Task<EmbeddingSession> GetEmbeddingSessionAsync(CancellationToken ct = default);
     Task<ProviderSetting?> GetActiveSettingAsync();
+    Task<ProviderSetting?> GetActiveEmbeddingSettingAsync() => Task.FromResult<ProviderSetting?>(null);
 }

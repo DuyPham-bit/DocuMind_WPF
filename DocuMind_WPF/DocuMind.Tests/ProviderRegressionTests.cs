@@ -269,6 +269,28 @@ public class ProviderRegressionTests
     }
 
     [Fact]
+    public async Task SettingsWarnsBeforeSavingMovesEmbeddingsToAnotherProvider()
+    {
+        using var fixture = new SqliteFixture(); using var http = new HttpClient(new FakeHandler());
+        var factory = new ChatProviderFactory(fixture, http, new FakeSecrets());
+        await factory.SaveAsync(new(AiProviderType.OpenRouter, "router-key", "openrouter/free", "nvidia/nemotron-3-embed-1b:free", UseForEmbedding: true));
+
+        using var viewModel = new SettingsViewModel(factory);
+        await viewModel.InitializeAsync();
+        Assert.Null(viewModel.EmbeddingSwitchWarning()); // same provider: nothing moves
+
+        viewModel.SelectedProvider = AiProviderType.Gemini; // Gemini defaults tick "use for embeddings"
+        await WaitUntilAsync(() => !viewModel.IsLoading);
+        Assert.True(viewModel.UseForEmbedding);
+        Assert.Contains("from OpenRouter to Gemini", viewModel.StatusMessage);
+
+        viewModel.UseForEmbedding = false; // chat-only switch keeps the existing index usable
+        Assert.Null(viewModel.EmbeddingSwitchWarning());
+        viewModel.UseForEmbedding = true;
+        Assert.Contains("from OpenRouter to Gemini", viewModel.StatusMessage);
+    }
+
+    [Fact]
     public async Task GeminiDefaultsAndLegacyTextEmbedding004NormalizeToGeminiEmbedding001()
     {
         var geminiDefaults = ChatProviderFactory.Defaults(AiProviderType.Gemini);

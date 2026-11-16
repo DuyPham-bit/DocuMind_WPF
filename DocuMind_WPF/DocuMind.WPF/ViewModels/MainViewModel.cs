@@ -107,23 +107,31 @@ public partial class MainViewModel : ObservableObject
     {
         await RefreshActiveProviderInfoAsync();
         if (!savedSuccessfully || SelectedWorkspace == null || !CanWork) return;
+        var id = SelectedWorkspace.Id; var conversation = SelectedWorkspace.ConversationId; var generation = _selectionGeneration;
 
-        var pendingPaths = UploadedFiles
-            .Where(f => f.NeedsReindex && !string.IsNullOrWhiteSpace(f.SourcePath) && File.Exists(f.SourcePath))
-            .Select(f => f.SourcePath)
-            .ToList();
-        if (pendingPaths.Count == 0) return;
+        // The saved provider may use a different embedding profile, so re-read the list:
+        // documents indexed with the old profile now count as pending.
+        List<DocumentListItem> files;
+        try { files = await _rag.GetWorkspaceFilesAsync(id); }
+        catch (Exception ex) { if (Matches(id, conversation, generation)) BusyStatus = UserErrors.Describe(ex); return; }
+        if (!Matches(id, conversation, generation)) return;
+        UploadedFiles.Clear(); foreach (var file in files) UploadedFiles.Add(file);
 
-        try
+        var pending = files.Where(f => f.NeedsReindex && !string.IsNullOrWhiteSpace(f.SourcePath)).ToList();
+        if (pending.Count == 0) return;
+        var missing = pending.Where(f => !File.Exists(f.SourcePath)).Select(f => f.DisplayName).ToList();
+        var pendingPaths = pending.Where(f => File.Exists(f.SourcePath)).Select(f => f.SourcePath).ToList();
+
+        try { await _providers.GetEmbeddingSessionAsync(); }
+        catch (Exception ex)
         {
-            await _providers.GetEmbeddingSessionAsync();
-        }
-        catch
-        {
+            BusyStatus = $"{pending.Count} document(s) need re-indexing, but no embedding provider is ready: {UserErrors.Describe(ex)}";
             return;
         }
 
-        await IngestFilesAsync(pendingPaths);
+        if (pendingPaths.Count > 0) await IngestFilesAsync(pendingPaths);
+        if (missing.Count > 0 && Matches(id, conversation, generation))
+            BusyStatus = (BusyStatus + $" Original file not found, upload again: {string.Join(", ", missing)}.").Trim();
     }
 
     partial void OnSelectedWorkspaceChanged(Workspace? value) => _ = ReloadSelectedWorkspaceAsync();
@@ -141,7 +149,7 @@ public partial class MainViewModel : ObservableObject
         {
             if (workspace == null) return;
             var filesTask = _rag.GetWorkspaceFilesAsync(workspace.Id, reload.Token);
-            var historyTask = _history.LoadAsync(workspace.Id, workspace.ConversationId, ct: reload.Token);
+            var historyTask = _history.LoadForDisplayAsync(workspace.Id, workspace.ConversationId, ct: reload.Token);
             await Task.WhenAll(filesTask, historyTask);
             if (!Matches(workspace.Id, workspace.ConversationId, generation)) return;
             foreach (var file in await filesTask) UploadedFiles.Add(file);
@@ -216,6 +224,7 @@ public partial class MainViewModel : ObservableObject
         var id = SelectedWorkspace.Id; var conversation = SelectedWorkspace.ConversationId; var generation = _selectionGeneration;
         var question = UserInput.Trim(); var prompt = SystemPrompt; var mode = UseRagMode ? ChatMode.Rag : ChatMode.Direct;
         UserInput = ""; IsBusy = true; BusyStatus = "Thinking…";
+        ChatMessageDisplayModel? pending = null;
         using var operation = new CancellationTokenSource(TimeSpan.FromMinutes(2)); _operation = operation;
         try
         {
@@ -224,13 +233,15 @@ public partial class MainViewModel : ObservableObject
             // History store applies a conservative UTF-8 byte/token budget before building provider turns.
             var history = previous.Where(m => m.Mode == mode).Select(m => new ChatTurn(m.Role == MessageRole.User ? "user" : "assistant", m.Content)).ToList();
             var user = Message(MessageRole.User, question, []);
-            if (Matches(id, conversation, generation)) ChatMessages.Add(ChatMessageDisplayModel.FromEntity(user));
+            pending = ChatMessageDisplayModel.FromEntity(user);
+            if (Matches(id, conversation, generation)) ChatMessages.Add(pending);
             ChatResultDto result = mode == ChatMode.Rag
                 ? await _rag.ChatWithRagAsync(id, prompt, question, ct: operation.Token, session: session, history: history)
                 : new(await _rag.ChatExternalAsync(prompt, question, operation.Token, session, history), []);
             var assistant = Message(MessageRole.Assistant, result.ResponseText, result.Sources);
             if (assistant.Timestamp <= user.Timestamp) assistant.Timestamp = user.Timestamp.AddTicks(1);
             await _history.AppendAsync(user, assistant, operation.Token);
+            pending = null;
             if (Matches(id, conversation, generation)) ChatMessages.Add(ChatMessageDisplayModel.FromEntity(assistant));
             if (Matches(id, conversation, generation)) BusyStatus = "";
 
@@ -242,7 +253,13 @@ public partial class MainViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            if (Matches(id, conversation, generation)) BusyStatus = UserErrors.Describe(ex);
+            if (Matches(id, conversation, generation))
+            {
+                BusyStatus = UserErrors.Describe(ex);
+                // The question was never saved: drop its bubble and give the text back so it can be resent.
+                if (pending != null) ChatMessages.Remove(pending);
+                if (string.IsNullOrEmpty(UserInput)) UserInput = question;
+            }
         }
         finally { _operation = null; IsBusy = false; }
     }
@@ -343,9 +360,9 @@ public partial class MainViewModel : ObservableObject
             var uri = new Uri(Path.GetFullPath(source.SourcePath)).AbsoluteUri;
             if (Path.GetExtension(source.SourcePath).Equals(".pdf", StringComparison.OrdinalIgnoreCase))
             {
-                var start = new ProcessStartInfo("msedge.exe") { UseShellExecute = false, CreateNoWindow = true };
-                start.ArgumentList.Add(uri + "#page=" + Math.Max(1, source.PageNumber));
-                Process.Start(start);
+                // Edge is not on PATH; the shell resolves it through App Paths. Without Edge, open the PDF in the default viewer (no page jump).
+                try { Process.Start(new ProcessStartInfo("msedge.exe", "\"" + uri + "#page=" + Math.Max(1, source.PageNumber) + "\"") { UseShellExecute = true }); }
+                catch (System.ComponentModel.Win32Exception) { Process.Start(new ProcessStartInfo(source.SourcePath) { UseShellExecute = true }); }
             }
             else Process.Start(new ProcessStartInfo(source.SourcePath) { UseShellExecute = true });
         }
