@@ -7,7 +7,7 @@ Dự án mẫu **Product Management** viết bằng **ASP.NET Core MVC (.NET 10)
 ## Chạy nhanh
 
 ```powershell
-cd d:\CN5.1\PRN212\26.FA.PRN212\Project-Prn212\ASM1
+cd ASM1   # từ thư mục gốc của repo
 dotnet test
 dotnet run --project ProductManagerMvc
 ```

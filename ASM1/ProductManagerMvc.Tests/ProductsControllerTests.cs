@@ -134,4 +134,30 @@ public class ProductsControllerTests
         Assert.Null(await db.Products.FindAsync(2));
         Assert.Equal(2, await db.Products.CountAsync());
     }
+
+    [Fact]
+    public async Task Edit_IdMismatchOrMissingProduct_ReturnsNotFound()
+    {
+        await using var db = CreateInMemoryDb(nameof(Edit_IdMismatchOrMissingProduct_ReturnsNotFound));
+        var controller = new ProductsController(db);
+
+        var mismatch = new Product { Id = 2, Name = "Sai id", Price = 1000, Stock = 1 };
+        Assert.IsType<NotFoundResult>(await controller.Edit(1, mismatch));
+
+        var missing = new Product { Id = 999, Name = "Không tồn tại", Price = 1000, Stock = 1 };
+        Assert.IsType<NotFoundResult>(await controller.Edit(999, missing));
+
+        var untouched = await db.Products.FindAsync(1);
+        Assert.Equal("Chuột gaming", untouched!.Name);
+    }
+
+    [Fact]
+    public async Task DeleteConfirmed_MissingId_ReturnsNotFoundAndKeepsData()
+    {
+        await using var db = CreateInMemoryDb(nameof(DeleteConfirmed_MissingId_ReturnsNotFoundAndKeepsData));
+        var controller = new ProductsController(db);
+
+        Assert.IsType<NotFoundResult>(await controller.DeleteConfirmed(999));
+        Assert.Equal(3, await db.Products.CountAsync());
+    }
 }

@@ -94,7 +94,7 @@ ASM1/
 #### Các bước chạy trên máy bạn:
 ```powershell
 # Bước 1: Di chuyển vào thư mục ASM1
-cd d:\CN5.1\PRN212\26.FA.PRN212\Project-Prn212\ASM1
+cd ASM1   # từ thư mục gốc của repo
 
 # Bước 2: Khôi phục NuGet packages & build kiểm tra lỗi biên dịch
 dotnet restore
@@ -307,7 +307,7 @@ AI Agent không thể đoán đúng ý bạn nếu prompt quá chung chung. Hãy
 ## III. Kịch bản Demo 5 phút & Lỗi thường gặp
 
 ### Kịch bản Demo 5 phút (theo Slide 21)
-1. **Run (30s):** Mở terminal chạy `dotnet test` (cho thấy 13/13 tests pass) rồi `dotnet run`, mở trình duyệt tại `/Products`.
+1. **Run (30s):** Mở terminal chạy `dotnet test` (cho thấy 15/15 tests pass) rồi `dotnet run`, mở trình duyệt tại `/Products`.
 2. **CRUD + Search (2 phút):**
    - Thấy sẵn 3 sản phẩm mẫu (`Chuột gaming`, `Bàn phím cơ`, `Tai nghe USB`).
    - Bấm **Thêm sản phẩm** → nhập 1 sản phẩm mới → lưu thành công.
