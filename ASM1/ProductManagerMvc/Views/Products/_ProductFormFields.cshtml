@@ -17,12 +17,12 @@
 <div class="row g-3">
     <div class="col-sm-6 form-field">
         <label asp-for="Price" class="form-label-app"></label>
-        <input asp-for="Price" class="form-input-app" type="number" step="1" min="0" />
+        <input asp-for="Price" class="form-input-app" type="number" step="1" min="1" max="999999999" />
         <span asp-validation-for="Price" class="field-error"></span>
     </div>
     <div class="col-sm-6 form-field">
         <label asp-for="Stock" class="form-label-app"></label>
-        <input asp-for="Stock" class="form-input-app" type="number" step="1" min="0" />
+        <input asp-for="Stock" class="form-input-app" type="number" step="1" min="0" max="100000" />
         <span asp-validation-for="Stock" class="field-error"></span>
     </div>
 </div>
