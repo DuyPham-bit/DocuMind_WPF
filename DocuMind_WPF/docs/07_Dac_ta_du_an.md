@@ -187,7 +187,7 @@ Endpoint mặc định là generativelanguage.googleapis.com/v1beta cho Gemini, 
 4. Sao chép file vào snapshot có tên ngẫu nhiên trong thư mục tạm, giữ extension. File nguồn được mở FileShare.Read; snapshot dùng cho cả hashing và parsing.
 5. Tính SHA256 của snapshot, parse theo trang; finally xóa snapshot kể cả lỗi. File gốc không bị sửa hoặc xóa.
 6. Với từng trang, chia theo cửa sổ 180 từ, overlap 30, bước dịch 150 từ. Trang trống không tạo chunk. File văn bản dùng ReadAllTextAsync và trang 1; PDF dùng PdfPig page.Text.
-7. Gửi từng chunk đến embedding service tuần tự. Xác minh vector hợp lệ và cùng dimension trong file. Serialize float array thành JSON, giữ chunks trong bộ nhớ với ChunkIndex tăng dần.
+7. Gửi các chunk đến embedding service theo lô tuần tự (`MaxBatchSize`: Gemini 50 qua `batchEmbedContents`, OpenAI-compatible 32 qua `input` mảng, provider khác 1). Kết quả lô phải đủ số vector và đúng thứ tự (OpenAI-compatible sắp lại theo `index`); endpoint trả 400/404/413/422 cho input mảng thì quay về gọi từng chunk, lỗi 401/403 không thử lại. Xác minh vector hợp lệ và cùng dimension trong file. Serialize float array thành JSON, giữ chunks trong bộ nhớ với ChunkIndex tăng dần.
 8. Nếu không có chunk hợp lệ thì báo lỗi. Khi hoàn tất, ActivateAsync mở transaction ngắn, lấy hoặc tạo profile trùng contract, xóa version cũ không Staging, thêm chunks, chuyển version thành Ready và cập nhật hash.
 9. Commit thành công mới thay index cũ. UI tải lại danh sách tài liệu và báo tên/số file hoàn tất hoặc lỗi/hủy nếu vẫn đúng selection ban đầu.
 
@@ -229,7 +229,7 @@ RAG dùng cùng cơ chế chụp session, lưu message và bảo vệ selection 
 
 Score là độ gần vector, không phải xác suất câu trả lời đúng. Nguồn hiển thị là các chunk được retrieval chọn trước khi sinh answer. Không có bước đối chiếu từng mệnh đề hoặc tự xác minh citation mà model viết. Delimiter và instruction giảm lẫn dữ liệu với chỉ thị nhưng không chứng minh mô hình chống mọi prompt injection.
 
-Tóm tắt bằng Quick start vẫn chỉ dùng tối đa topK chunk, nên không bảo đảm bao phủ toàn bộ tài liệu dài. Truy xuất hiện load và chấm điểm trong bộ nhớ, chưa dùng vector database/ANN, chưa batch embedding và chưa song song hóa. Chi phí tăng theo tổng số chunk tương thích và số request embedding.
+Tóm tắt bằng Quick start vẫn chỉ dùng tối đa topK chunk, nên không bảo đảm bao phủ toàn bộ tài liệu dài. Truy xuất hiện load và chấm điểm trong bộ nhớ, chưa dùng vector database/ANN; embedding khi nạp đã gửi theo lô nhưng các lô vẫn chạy tuần tự, chưa song song hóa. Chi phí tăng theo tổng số chunk tương thích và số request embedding.
 
 ## 12 Luồng workspace và vòng đời chat
 
@@ -354,7 +354,7 @@ Rà soát diff thay đổi giao diện gần nhất và các đường gọi hi�
 
 Giới hạn còn lại cần hiểu khi nghiệm thu: cửa sổ history/export chưa gồm toàn bộ conversation; câu hỏi lỗi có thể chỉ còn bubble chưa lưu; chưa có xử lý riêng AI trả rỗng hoặc bị chặn; source path có thể trỏ đến file đã sửa; tóm tắt topK không bảo đảm toàn tài liệu. Đây là giới hạn hiện hành, không trình bày thành regression mới của thay đổi tài liệu.
 
-Hướng phát triển có thể gồm màn hình chọn conversation và export toàn bộ; phân tách history hiển thị khỏi budget request; xử lý response rỗng; OCR/parser DOCX đúng cấu trúc; context budget cho cả câu hỏi và nguồn; tổng hợp toàn tài liệu; tôn trọng Retry-After; benchmark vector store và batch embedding; kiểm thử model thực bằng tập câu hỏi chuẩn. Mỗi hướng cần tiêu chí nghiệm thu và test riêng trước khi được ghi là tính năng hoàn thành.
+Hướng phát triển có thể gồm màn hình chọn conversation và export toàn bộ; phân tách history hiển thị khỏi budget request; xử lý response rỗng; OCR/parser DOCX đúng cấu trúc; context budget cho cả câu hỏi và nguồn; tổng hợp toàn tài liệu; tôn trọng Retry-After; benchmark vector store và kích thước lô embedding; kiểm thử model thực bằng tập câu hỏi chuẩn. Mỗi hướng cần tiêu chí nghiệm thu và test riêng trước khi được ghi là tính năng hoàn thành.
 
 ## 19 Bản đồ mã nguồn và tài liệu đối chiếu
 
