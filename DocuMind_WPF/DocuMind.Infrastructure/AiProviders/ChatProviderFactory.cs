@@ -1,5 +1,6 @@
 using DocuMind.Application.DTOs;
 using DocuMind.Application.Interfaces;
+using DocuMind.Application.Services;
 using DocuMind.Domain.Entities;
 using DocuMind.Domain.Enums;
 using DocuMind.Infrastructure.Persistence;
@@ -95,6 +96,12 @@ public sealed class ChatProviderFactory(IDbContextFactory<AppDbContext> contexts
         return await db.ProviderSettings.AsNoTracking().SingleOrDefaultAsync(x => x.IsActive);
     }
 
+    public async Task<ProviderSetting?> GetActiveEmbeddingSettingAsync()
+    {
+        await using var db = await contexts.CreateDbContextAsync();
+        return await db.ProviderSettings.AsNoTracking().SingleOrDefaultAsync(x => x.IsEmbeddingActive);
+    }
+
     public async Task<ChatSession> GetChatSessionAsync(CancellationToken ct = default)
     {
         var setting = await GetActiveSettingAsync() ?? throw new InvalidOperationException("Hãy mở Cài đặt và lưu provider chat.");
@@ -144,15 +151,19 @@ public sealed class ChatProviderFactory(IDbContextFactory<AppDbContext> contexts
     private static void Validate(ProviderConfigDraft draft)
     {
         if (!Enum.IsDefined(draft.ProviderType) || string.IsNullOrWhiteSpace(draft.ChatModel))
-            throw new InvalidOperationException("Hãy chọn provider và model chat.");
+            throw new UserFacingException(AppText.T("Choose a provider and enter a chat model.",
+                "Hãy chọn provider và nhập model chat."));
         if (draft.ProviderType != AiProviderType.OllamaLocal && string.IsNullOrWhiteSpace(draft.ApiKey))
-            throw new InvalidOperationException("Hãy nhập API key.");
+            throw new UserFacingException(AppText.T("Enter an API key for this provider.",
+                "Hãy nhập API key cho provider này."));
         if (!double.IsFinite(draft.Temperature) || draft.Temperature is < 0 or > 2)
-            throw new InvalidOperationException("Temperature phải nằm trong khoảng 0 đến 2.");
+            throw new UserFacingException(AppText.T("Temperature must be between 0 and 2.",
+                "Temperature phải nằm trong khoảng 0 đến 2."));
         var endpoint = EffectiveEndpoint(draft.ProviderType, draft.BaseUrl);
         if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) ||
             (uri.Scheme != "https" && !(uri.Scheme == "http" && uri.IsLoopback)) ||
             uri.Query.Length != 0 || uri.UserInfo.Length != 0 || uri.Fragment.Length != 0)
-            throw new InvalidOperationException("Base URL phải là HTTPS (hoặc HTTP localhost), không chứa key, query hay thông tin đăng nhập.");
+            throw new UserFacingException(AppText.T("Base URL must use HTTPS (or HTTP on localhost) and must not contain a key, query string, or credentials.",
+                "Base URL phải dùng HTTPS (hoặc HTTP với localhost) và không được chứa key, query string hay thông tin đăng nhập."));
     }
 }

@@ -3,6 +3,7 @@ using DocuMind.Application.Interfaces;
 using DocuMind.Application.Services;
 using DocuMind.Domain.Entities;
 using DocuMind.Domain.Enums;
+using DocuMind.Infrastructure.AiProviders;
 using DocuMind.Infrastructure.Persistence;
 using DocuMind.WPF.ViewModels;
 using Microsoft.EntityFrameworkCore;
@@ -99,6 +100,45 @@ public class WorkspaceRegressionTests
     }
 
     [Fact]
+    public async Task LongVietnameseAnswerIsStillShownAfterReload()
+    {
+        using var fixture = new SqliteFixture(); var repository = new EfRepository<Workspace>(fixture); var history = new EfChatHistoryStore(fixture);
+        var workspace = (await repository.GetAllAsync()).Single();
+        var longAnswer = string.Concat(Enumerable.Repeat("Tóm tắt nội dung chương học. ", 400)); // well over the model-context byte budget
+        await history.AppendAsync(new() { WorkspaceId = workspace.Id, ConversationId = workspace.ConversationId, Content = "câu hỏi 1" },
+            new() { WorkspaceId = workspace.Id, ConversationId = workspace.ConversationId, Role = MessageRole.Assistant, Content = "trả lời 1", Timestamp = DateTime.UtcNow.AddSeconds(1) });
+        await history.AppendAsync(new() { WorkspaceId = workspace.Id, ConversationId = workspace.ConversationId, Content = "tóm tắt giúp mình", Timestamp = DateTime.UtcNow.AddSeconds(2) },
+            new() { WorkspaceId = workspace.Id, ConversationId = workspace.ConversationId, Role = MessageRole.Assistant, Content = longAnswer, Timestamp = DateTime.UtcNow.AddSeconds(3) });
+        var providers = new FakeProviders();
+        var vm = new MainViewModel(new(providers, new FakeParser(), new EfDocumentStore(fixture)), providers, repository, history) { SelectedWorkspace = workspace };
+        await ProviderRegressionTests.WaitUntilAsync(() => !vm.IsLoading);
+        Assert.Equal(new[] { "câu hỏi 1", "trả lời 1", "tóm tắt giúp mình", longAnswer }, vm.ChatMessages.Select(m => m.Content));
+    }
+
+    [Fact]
+    public async Task FailedSendRestoresQuestionAndDoesNotLeaveUnsavedBubble()
+    {
+        using var fixture = new SqliteFixture(); var repository = new EfRepository<Workspace>(fixture); var history = new EfChatHistoryStore(fixture);
+        var providers = new FakeProviders(); providers.Ai.Respond = _ => throw new HttpRequestException("fake failure");
+        var vm = new MainViewModel(new(providers, new FakeParser(), new EfDocumentStore(fixture)), providers, repository, history)
+            { UseRagMode = false, SelectedWorkspace = (await repository.GetAllAsync()).Single() };
+        await ProviderRegressionTests.WaitUntilAsync(() => !vm.IsLoading);
+        vm.UserInput = "question that fails"; await vm.SendMessageCommand.ExecuteAsync(null);
+        Assert.Empty(vm.ChatMessages); Assert.Equal("question that fails", vm.UserInput); Assert.False(vm.IsBusy);
+    }
+
+    [Fact]
+    public async Task ValidationErrorsReachTheUserInsteadOfAGenericMessage()
+    {
+        using var fixture = new SqliteFixture(); using var http = new HttpClient(new FakeHandler());
+        var factory = new ChatProviderFactory(fixture, http, new FakeSecrets());
+        var missingKey = await Assert.ThrowsAsync<UserFacingException>(() => factory.SaveAsync(new(AiProviderType.OpenAI, "", "gpt-4o-mini")));
+        Assert.Contains("API key", UserErrors.Describe(missingKey));
+        var badUrl = Assert.Throws<UserFacingException>(() => factory.CreateTemporary(new(AiProviderType.OpenAI, "key", "chat", BaseUrl: "http://example.com/v1")));
+        Assert.Contains("HTTPS", UserErrors.Describe(badUrl));
+    }
+
+    [Fact]
     public async Task CancelCommandStopsEmbeddingRestoresUiAndRetainsReadyVersion()
     {
         using var fixture = new SqliteFixture(); var providers = new FakeProviders(); var parser = new FakeParser(); var store = new EfDocumentStore(fixture);
@@ -142,6 +182,42 @@ public class WorkspaceRegressionTests
         await vm.OnProviderSettingsClosedAsync(savedSuccessfully: true);
         Assert.False(Assert.Single(vm.UploadedFiles).NeedsReindex);
         Assert.Contains("Completed 1", vm.BusyStatus);
+    }
+
+    [Fact]
+    public async Task SavingANewEmbeddingProviderReindexesDocumentsBuiltWithTheOldOne()
+    {
+        using var fixture = new SqliteFixture(); var repository = new EfRepository<Workspace>(fixture);
+        var providers = new FakeProviders(); var store = new EfDocumentStore(fixture);
+        var rag = new RagOrchestratorService(providers, new FakeParser(), store);
+        await rag.IngestDocumentAsync(SqliteFixture.WorkspaceId, fixture.File("lecture.txt"));
+        var vm = new MainViewModel(rag, providers, repository, new EfChatHistoryStore(fixture));
+        await vm.InitializeAsync(); await ProviderRegressionTests.WaitUntilAsync(() => !vm.IsLoading);
+        Assert.False(Assert.Single(vm.UploadedFiles).NeedsReindex);
+
+        providers.EmbeddingModel = "embedding-b"; // the user saved a different embedding provider in Settings
+        await vm.OnProviderSettingsClosedAsync(savedSuccessfully: true);
+
+        Assert.False(Assert.Single(vm.UploadedFiles).NeedsReindex);
+        Assert.Contains("Completed 1", vm.BusyStatus);
+        Assert.Equal("old content", Assert.Single((await rag.ChatWithRagAsync(SqliteFixture.WorkspaceId, "system", "question")).Sources).Content);
+    }
+
+    [Fact]
+    public async Task PendingDocumentsWithoutEmbeddingProviderExplainWhyNothingWasReindexed()
+    {
+        using var fixture = new SqliteFixture(); var repository = new EfRepository<Workspace>(fixture);
+        var providers = new FakeProviders(); var store = new EfDocumentStore(fixture);
+        var staging = await store.BeginAsync(SqliteFixture.WorkspaceId, fixture.File("pending.txt"), CancellationToken.None);
+        await store.FailAsync(staging.Id);
+        var vm = new MainViewModel(new(providers, new FakeParser(), store), providers, repository, new EfChatHistoryStore(fixture));
+        await vm.InitializeAsync(); await ProviderRegressionTests.WaitUntilAsync(() => !vm.IsLoading);
+
+        providers.EmbeddingEnabled = false;
+        await vm.OnProviderSettingsClosedAsync(savedSuccessfully: true);
+
+        Assert.True(Assert.Single(vm.UploadedFiles).NeedsReindex);
+        Assert.Contains("need re-indexing", vm.BusyStatus);
     }
 
     private sealed class DelayedDocumentStore(IDocumentStore inner) : IDocumentStore

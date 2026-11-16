@@ -6,7 +6,16 @@ namespace DocuMind.Infrastructure.Persistence;
 
 public sealed class EfChatHistoryStore(IDbContextFactory<AppDbContext> contexts) : IChatHistoryStore
 {
-    public async Task<List<ChatMessage>> LoadAsync(Guid workspaceId, Guid conversationId, int tokenBudget = 4000, CancellationToken ct = default)
+    public async Task<List<ChatMessage>> LoadForDisplayAsync(Guid workspaceId, Guid conversationId, int limit = 200, CancellationToken ct = default)
+    {
+        await using var db = await contexts.CreateDbContextAsync(ct);
+        var messages = await db.ChatMessages.AsNoTracking().Where(m => m.WorkspaceId == workspaceId && m.ConversationId == conversationId)
+            .OrderByDescending(m => m.Timestamp).ThenByDescending(m => m.Id).Take(Math.Max(1, limit)).ToListAsync(ct);
+        messages.Reverse();
+        return messages;
+    }
+
+    public async Task<List<ChatMessage>> LoadAsync(Guid workspaceId, Guid conversationId, int tokenBudget = 16000, CancellationToken ct = default)
     {
         await using var db = await contexts.CreateDbContextAsync(ct);
         var messages = await db.ChatMessages.AsNoTracking().Where(m => m.WorkspaceId == workspaceId && m.ConversationId == conversationId)

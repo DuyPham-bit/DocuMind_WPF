@@ -36,7 +36,7 @@ public sealed class RagOrchestratorService(IChatProviderFactory providers, IDocu
                 await using (var destination = new FileStream(snapshot, FileMode.CreateNew, FileAccess.Write, FileShare.None))
                     await source.CopyToAsync(destination, ct);
                 await using (var content = File.OpenRead(snapshot)) hash = Convert.ToHexString(await SHA256.HashDataAsync(content, ct));
-                progress?.Report("Reading document…");
+                progress?.Report(AppText.T("Reading document…", "Đang đọc tài liệu…"));
                 pages = await parser.ParseFileAsync(snapshot, ct);
             }
             finally { if (File.Exists(snapshot)) File.Delete(snapshot); }
@@ -46,7 +46,7 @@ public sealed class RagOrchestratorService(IChatProviderFactory providers, IDocu
             foreach (var part in VectorMathHelper.ChunkText(text))
             {
                 ct.ThrowIfCancellationRequested();
-                progress?.Report($"Creating embedding {chunks.Count + 1} (page {page})…");
+                progress?.Report(AppText.T($"Creating embedding {chunks.Count + 1} (page {page})…", $"Đang tạo embedding {chunks.Count + 1} (trang {page})…"));
                 var vector = await embedding.Service.GenerateEmbeddingAsync(part, ct);
                 if (!VectorMathHelper.IsValidVector(vector) || (dimension != 0 && dimension != vector.Length))
                     throw new InvalidOperationException("The embedding is empty, non-finite, or has an inconsistent dimension. The previous index was preserved.");
@@ -60,7 +60,7 @@ public sealed class RagOrchestratorService(IChatProviderFactory providers, IDocu
                 Provider = embedding.Provider, Model = embedding.Model, Endpoint = embedding.Endpoint, Dimension = dimension,
                 Normalization = EmbeddingSession.Normalization, PipelineVersion = EmbeddingSession.PipelineVersion
             }, chunks, ct);
-            progress?.Report($"Indexed {Path.GetFileName(filePath)} ({chunks.Count} chunks).");
+            progress?.Report(AppText.T($"Indexed {Path.GetFileName(filePath)} ({chunks.Count} chunks).", $"Đã nạp {Path.GetFileName(filePath)} ({chunks.Count} đoạn)."));
         }
         catch
         {
@@ -108,7 +108,14 @@ public sealed class RagOrchestratorService(IChatProviderFactory providers, IDocu
         return new(answer, sources);
     }
 
-    private static ChatResultDto NoSources() => new("There is not enough evidence in compatible documents to answer. Upload a document or re-index with the current embedding profile.", []);
-    public Task<List<DocumentListItem>> GetWorkspaceFilesAsync(Guid workspaceId, CancellationToken ct = default) => documents.ListAsync(workspaceId, ct);
+    private static ChatResultDto NoSources() => new(AppText.T("There is not enough evidence in compatible documents to answer. Upload a document or re-index with the current embedding profile.",
+        "Tài liệu tương thích chưa có đủ thông tin để trả lời. Hãy nạp tài liệu hoặc nạp lại theo embedding profile hiện tại."), []);
+    public async Task<List<DocumentListItem>> GetWorkspaceFilesAsync(Guid workspaceId, CancellationToken ct = default)
+    {
+        EmbeddingSession? current;
+        try { current = await providers.GetEmbeddingSessionAsync(ct); }
+        catch (InvalidOperationException) { current = null; } // No usable embedding provider: fall back to the Ready status only.
+        return await documents.ListAsync(workspaceId, current, ct);
+    }
     public Task DeleteDocumentAsync(Guid workspaceId, Guid documentId, CancellationToken ct = default) => documents.DeleteAsync(workspaceId, documentId, ct);
 }

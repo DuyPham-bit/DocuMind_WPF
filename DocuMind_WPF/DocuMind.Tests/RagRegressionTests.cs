@@ -137,4 +137,23 @@ public class RagRegressionTests
         var error = await Assert.ThrowsAsync<InvalidOperationException>(() => rag.ChatWithRagAsync(SqliteFixture.WorkspaceId, "system", "question"));
         Assert.Contains("embedding", error.Message);
     }
+
+    [Fact]
+    public async Task DocumentIndexedWithAnotherEmbeddingProfileIsListedAsNeedingReindex()
+    {
+        using var fixture = new SqliteFixture();
+        var providers = new FakeProviders();
+        var rag = new RagOrchestratorService(providers, new FakeParser(), new EfDocumentStore(fixture));
+        await rag.IngestDocumentAsync(SqliteFixture.WorkspaceId, fixture.File());
+        Assert.False(Assert.Single(await rag.GetWorkspaceFilesAsync(SqliteFixture.WorkspaceId)).NeedsReindex);
+
+        // The user saves another embedding provider: the old index can no longer be cited, so the list must say so.
+        providers.EmbeddingModel = "embedding-b";
+        Assert.True(Assert.Single(await rag.GetWorkspaceFilesAsync(SqliteFixture.WorkspaceId)).NeedsReindex);
+        Assert.Empty((await rag.ChatWithRagAsync(SqliteFixture.WorkspaceId, "system", "question")).Sources);
+
+        // Without any embedding provider the list falls back to the Ready status only.
+        providers.EmbeddingEnabled = false;
+        Assert.False(Assert.Single(await rag.GetWorkspaceFilesAsync(SqliteFixture.WorkspaceId)).NeedsReindex);
+    }
 }

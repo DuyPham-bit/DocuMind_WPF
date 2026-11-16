@@ -46,12 +46,12 @@ public partial class MainViewModel : ObservableObject
     {
         _rag = rag; _providers = providers; _workspaces = workspaces; _history = history;
         ChatMessages.CollectionChanged += (_, _) => OnPropertyChanged(nameof(IsChatEmpty));
-        UiText.Current.PropertyChanged += (_, args) =>
-        {
-            if (args.PropertyName == nameof(UiText.IsVietnamese)) RefreshPromptTemplates();
-        };
+        // Weak subscription: the static UiText.Current must not keep view models alive.
+        System.ComponentModel.PropertyChangedEventManager.AddHandler(UiText.Current, OnLanguageChanged, nameof(UiText.IsVietnamese));
         RefreshPromptTemplates();
     }
+
+    private void OnLanguageChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e) => RefreshPromptTemplates();
 
     private void RefreshPromptTemplates()
     {
@@ -98,7 +98,7 @@ public partial class MainViewModel : ObservableObject
         try
         {
             var active = await _providers.GetActiveSettingAsync();
-            ActiveProviderInfo = active == null ? "Not configured" : $"{active.ProviderType} · {active.ChatModel}";
+            ActiveProviderInfo = active == null ? AppText.T("Not configured", "Chưa cấu hình") : $"{active.ProviderType} · {active.ChatModel}";
         }
         catch (Exception ex) { ActiveProviderInfo = UserErrors.Describe(ex); }
     }
@@ -107,23 +107,32 @@ public partial class MainViewModel : ObservableObject
     {
         await RefreshActiveProviderInfoAsync();
         if (!savedSuccessfully || SelectedWorkspace == null || !CanWork) return;
+        var id = SelectedWorkspace.Id; var conversation = SelectedWorkspace.ConversationId; var generation = _selectionGeneration;
 
-        var pendingPaths = UploadedFiles
-            .Where(f => f.NeedsReindex && !string.IsNullOrWhiteSpace(f.SourcePath) && File.Exists(f.SourcePath))
-            .Select(f => f.SourcePath)
-            .ToList();
-        if (pendingPaths.Count == 0) return;
+        // The saved provider may use a different embedding profile, so re-read the list:
+        // documents indexed with the old profile now count as pending.
+        List<DocumentListItem> files;
+        try { files = await _rag.GetWorkspaceFilesAsync(id); }
+        catch (Exception ex) { if (Matches(id, conversation, generation)) BusyStatus = UserErrors.Describe(ex); return; }
+        if (!Matches(id, conversation, generation)) return;
+        UploadedFiles.Clear(); foreach (var file in files) UploadedFiles.Add(file);
 
-        try
+        var pending = files.Where(f => f.NeedsReindex && !string.IsNullOrWhiteSpace(f.SourcePath)).ToList();
+        if (pending.Count == 0) return;
+        var missing = pending.Where(f => !File.Exists(f.SourcePath)).Select(f => f.DisplayName).ToList();
+        var pendingPaths = pending.Where(f => File.Exists(f.SourcePath)).Select(f => f.SourcePath).ToList();
+
+        try { await _providers.GetEmbeddingSessionAsync(); }
+        catch (Exception ex)
         {
-            await _providers.GetEmbeddingSessionAsync();
-        }
-        catch
-        {
+            BusyStatus = AppText.T($"{pending.Count} document(s) need re-indexing, but no embedding provider is ready: {UserErrors.Describe(ex)}",
+                $"{pending.Count} tài liệu cần nạp lại nhưng chưa có provider embedding sẵn sàng: {UserErrors.Describe(ex)}");
             return;
         }
 
-        await IngestFilesAsync(pendingPaths);
+        if (pendingPaths.Count > 0) await IngestFilesAsync(pendingPaths);
+        if (missing.Count > 0 && Matches(id, conversation, generation))
+            BusyStatus = (BusyStatus + AppText.T($" Original file not found, upload again: {string.Join(", ", missing)}.", $" Không tìm thấy file gốc, hãy nạp lại: {string.Join(", ", missing)}.")).Trim();
     }
 
     partial void OnSelectedWorkspaceChanged(Workspace? value) => _ = ReloadSelectedWorkspaceAsync();
@@ -141,7 +150,7 @@ public partial class MainViewModel : ObservableObject
         {
             if (workspace == null) return;
             var filesTask = _rag.GetWorkspaceFilesAsync(workspace.Id, reload.Token);
-            var historyTask = _history.LoadAsync(workspace.Id, workspace.ConversationId, ct: reload.Token);
+            var historyTask = _history.LoadForDisplayAsync(workspace.Id, workspace.ConversationId, ct: reload.Token);
             await Task.WhenAll(filesTask, historyTask);
             if (!Matches(workspace.Id, workspace.ConversationId, generation)) return;
             foreach (var file in await filesTask) UploadedFiles.Add(file);
@@ -161,7 +170,7 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanWork))]
     private async Task UploadDocumentAsync()
     {
-        var dialog = new OpenFileDialog { Title = "Choose documents", Filter = "Documents (*.pdf;*.txt;*.md)|*.pdf;*.txt;*.md|All files (*.*)|*.*", Multiselect = true };
+        var dialog = new OpenFileDialog { Title = AppText.T("Choose documents", "Chọn tài liệu"), Filter = "Documents (*.pdf;*.txt;*.md)|*.pdf;*.txt;*.md|All files (*.*)|*.*", Multiselect = true };
         if (SelectedWorkspace != null && dialog.ShowDialog() == true) await IngestFilesAsync(dialog.FileNames);
     }
 
@@ -179,13 +188,14 @@ public partial class MainViewModel : ObservableObject
             {
                 if (operation.IsCancellationRequested) break;
                 try { await _rag.IngestDocumentAsync(id, path, progress, operation.Token); success.Add(Path.GetFileName(path)); }
-                catch (OperationCanceledException) { failures.Add(Path.GetFileName(path) + ": canceled or timed out"); break; }
+                catch (OperationCanceledException) { failures.Add(Path.GetFileName(path) + AppText.T(": canceled or timed out", ": đã hủy hoặc hết thời gian chờ")); break; }
                 catch (Exception ex) { failures.Add(Path.GetFileName(path) + ": " + UserErrors.Describe(ex)); }
             }
             var files = await _rag.GetWorkspaceFilesAsync(id);
             if (!Matches(id, conversation, generation)) return;
             UploadedFiles.Clear(); foreach (var file in files) UploadedFiles.Add(file);
-            BusyStatus = $"Completed {success.Count}: {string.Join(", ", success)}. Failed or canceled {failures.Count}: {string.Join("; ", failures)}";
+            BusyStatus = AppText.T($"Completed {success.Count}: {string.Join(", ", success)}. Failed or canceled {failures.Count}: {string.Join("; ", failures)}",
+                $"Hoàn tất {success.Count}: {string.Join(", ", success)}. Lỗi hoặc đã hủy {failures.Count}: {string.Join("; ", failures)}");
         }
         catch (Exception ex) { if (Matches(id, conversation, generation)) BusyStatus = UserErrors.Describe(ex); }
         finally { _operation = null; IsBusy = false; }
@@ -198,7 +208,9 @@ public partial class MainViewModel : ObservableObject
     {
         if (SelectedWorkspace == null || document == null) return;
         var id = SelectedWorkspace.Id; var conversation = SelectedWorkspace.ConversationId; var generation = _selectionGeneration;
-        if (MessageBox.Show($"Remove '{document.DisplayName}' ({document.SourcePath}) and all of its index versions?", "Remove document", MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
+        if (MessageBox.Show(AppText.T($"Remove '{document.DisplayName}' ({document.SourcePath}) and all of its index versions?",
+                $"Xóa '{document.DisplayName}' ({document.SourcePath}) cùng mọi phiên bản index của nó?"),
+            AppText.T("Remove document", "Xóa tài liệu"), MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
         IsBusy = true;
         try
         {
@@ -215,7 +227,8 @@ public partial class MainViewModel : ObservableObject
         if (string.IsNullOrWhiteSpace(UserInput) || SelectedWorkspace == null || !CanWork) return;
         var id = SelectedWorkspace.Id; var conversation = SelectedWorkspace.ConversationId; var generation = _selectionGeneration;
         var question = UserInput.Trim(); var prompt = SystemPrompt; var mode = UseRagMode ? ChatMode.Rag : ChatMode.Direct;
-        UserInput = ""; IsBusy = true; BusyStatus = "Thinking…";
+        UserInput = ""; IsBusy = true; BusyStatus = AppText.T("Thinking…", "Đang suy nghĩ…");
+        ChatMessageDisplayModel? pending = null;
         using var operation = new CancellationTokenSource(TimeSpan.FromMinutes(2)); _operation = operation;
         try
         {
@@ -224,13 +237,15 @@ public partial class MainViewModel : ObservableObject
             // History store applies a conservative UTF-8 byte/token budget before building provider turns.
             var history = previous.Where(m => m.Mode == mode).Select(m => new ChatTurn(m.Role == MessageRole.User ? "user" : "assistant", m.Content)).ToList();
             var user = Message(MessageRole.User, question, []);
-            if (Matches(id, conversation, generation)) ChatMessages.Add(ChatMessageDisplayModel.FromEntity(user));
+            pending = ChatMessageDisplayModel.FromEntity(user);
+            if (Matches(id, conversation, generation)) ChatMessages.Add(pending);
             ChatResultDto result = mode == ChatMode.Rag
                 ? await _rag.ChatWithRagAsync(id, prompt, question, ct: operation.Token, session: session, history: history)
                 : new(await _rag.ChatExternalAsync(prompt, question, operation.Token, session, history), []);
             var assistant = Message(MessageRole.Assistant, result.ResponseText, result.Sources);
             if (assistant.Timestamp <= user.Timestamp) assistant.Timestamp = user.Timestamp.AddTicks(1);
             await _history.AppendAsync(user, assistant, operation.Token);
+            pending = null;
             if (Matches(id, conversation, generation)) ChatMessages.Add(ChatMessageDisplayModel.FromEntity(assistant));
             if (Matches(id, conversation, generation)) BusyStatus = "";
 
@@ -242,7 +257,13 @@ public partial class MainViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            if (Matches(id, conversation, generation)) BusyStatus = UserErrors.Describe(ex);
+            if (Matches(id, conversation, generation))
+            {
+                BusyStatus = UserErrors.Describe(ex);
+                // The question was never saved: drop its bubble and give the text back so it can be resent.
+                if (pending != null) ChatMessages.Remove(pending);
+                if (string.IsNullOrEmpty(UserInput)) UserInput = question;
+            }
         }
         finally { _operation = null; IsBusy = false; }
     }
@@ -269,7 +290,7 @@ public partial class MainViewModel : ObservableObject
         IsBusy = true;
         try
         {
-            var workspace = new Workspace { Name = "New workspace", SystemPrompt = SystemPrompt };
+            var workspace = new Workspace { Name = AppText.T("New workspace", "Workspace mới"), SystemPrompt = SystemPrompt };
             await _workspaces.AddAsync(workspace); Workspaces.Add(workspace);
             if (generation == _selectionGeneration) SelectedWorkspace = workspace;
         }
@@ -301,8 +322,9 @@ public partial class MainViewModel : ObservableObject
     {
         if (SelectedWorkspace == null) return;
         var workspace = SelectedWorkspace;
-        if (MessageBox.Show($"Delete workspace '{workspace.Name}'? Its documents, index versions, and chat history will be permanently removed.",
-            "Delete workspace", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+        if (MessageBox.Show(AppText.T($"Delete workspace '{workspace.Name}'? Its documents, index versions, and chat history will be permanently removed.",
+                $"Xóa workspace '{workspace.Name}'? Toàn bộ tài liệu, phiên bản index và lịch sử chat sẽ bị xóa vĩnh viễn."),
+            AppText.T("Delete workspace", "Xóa workspace"), MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
         IsBusy = true;
         try
         {
@@ -337,15 +359,15 @@ public partial class MainViewModel : ObservableObject
     }
     [RelayCommand] private void OpenSource(RagSourceDto? source)
     {
-        if (source?.SourcePath == null || !File.Exists(source.SourcePath)) { BusyStatus = "The original source file is no longer available on this device."; return; }
+        if (source?.SourcePath == null || !File.Exists(source.SourcePath)) { BusyStatus = AppText.T("The original source file is no longer available on this device.", "File nguồn gốc không còn trên máy này."); return; }
         try
         {
             var uri = new Uri(Path.GetFullPath(source.SourcePath)).AbsoluteUri;
             if (Path.GetExtension(source.SourcePath).Equals(".pdf", StringComparison.OrdinalIgnoreCase))
             {
-                var start = new ProcessStartInfo("msedge.exe") { UseShellExecute = false, CreateNoWindow = true };
-                start.ArgumentList.Add(uri + "#page=" + Math.Max(1, source.PageNumber));
-                Process.Start(start);
+                // Edge is not on PATH; the shell resolves it through App Paths. Without Edge, open the PDF in the default viewer (no page jump).
+                try { Process.Start(new ProcessStartInfo("msedge.exe", "\"" + uri + "#page=" + Math.Max(1, source.PageNumber) + "\"") { UseShellExecute = true }); }
+                catch (System.ComponentModel.Win32Exception) { Process.Start(new ProcessStartInfo(source.SourcePath) { UseShellExecute = true }); }
             }
             else Process.Start(new ProcessStartInfo(source.SourcePath) { UseShellExecute = true });
         }

@@ -458,7 +458,7 @@
                                      MaxHeight="92" MinHeight="40"
                                      VerticalScrollBarVisibility="Auto"
                                      TextWrapping="Wrap"
-                                     KeyDown="TxtInput_KeyDown"/>
+                                     PreviewKeyDown="TxtInput_KeyDown"/>
                             <Button Grid.Column="1" Content="{Binding Source={x:Static loc:UiText.Current}, Path=SendButton}" Command="{Binding SendMessageCommand}" Style="{StaticResource PrimaryButton}" MinWidth="98" Margin="10,0,0,0" VerticalAlignment="Bottom"/>
                         </Grid>
                     </Border>
