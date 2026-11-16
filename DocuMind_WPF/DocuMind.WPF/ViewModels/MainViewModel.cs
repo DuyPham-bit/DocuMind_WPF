@@ -46,12 +46,12 @@ public partial class MainViewModel : ObservableObject
     {
         _rag = rag; _providers = providers; _workspaces = workspaces; _history = history;
         ChatMessages.CollectionChanged += (_, _) => OnPropertyChanged(nameof(IsChatEmpty));
-        UiText.Current.PropertyChanged += (_, args) =>
-        {
-            if (args.PropertyName == nameof(UiText.IsVietnamese)) RefreshPromptTemplates();
-        };
+        // Weak subscription: the static UiText.Current must not keep view models alive.
+        System.ComponentModel.PropertyChangedEventManager.AddHandler(UiText.Current, OnLanguageChanged, nameof(UiText.IsVietnamese));
         RefreshPromptTemplates();
     }
+
+    private void OnLanguageChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e) => RefreshPromptTemplates();
 
     private void RefreshPromptTemplates()
     {
@@ -98,7 +98,7 @@ public partial class MainViewModel : ObservableObject
         try
         {
             var active = await _providers.GetActiveSettingAsync();
-            ActiveProviderInfo = active == null ? "Not configured" : $"{active.ProviderType} · {active.ChatModel}";
+            ActiveProviderInfo = active == null ? AppText.T("Not configured", "Chưa cấu hình") : $"{active.ProviderType} · {active.ChatModel}";
         }
         catch (Exception ex) { ActiveProviderInfo = UserErrors.Describe(ex); }
     }
@@ -125,13 +125,14 @@ public partial class MainViewModel : ObservableObject
         try { await _providers.GetEmbeddingSessionAsync(); }
         catch (Exception ex)
         {
-            BusyStatus = $"{pending.Count} document(s) need re-indexing, but no embedding provider is ready: {UserErrors.Describe(ex)}";
+            BusyStatus = AppText.T($"{pending.Count} document(s) need re-indexing, but no embedding provider is ready: {UserErrors.Describe(ex)}",
+                $"{pending.Count} tài liệu cần nạp lại nhưng chưa có provider embedding sẵn sàng: {UserErrors.Describe(ex)}");
             return;
         }
 
         if (pendingPaths.Count > 0) await IngestFilesAsync(pendingPaths);
         if (missing.Count > 0 && Matches(id, conversation, generation))
-            BusyStatus = (BusyStatus + $" Original file not found, upload again: {string.Join(", ", missing)}.").Trim();
+            BusyStatus = (BusyStatus + AppText.T($" Original file not found, upload again: {string.Join(", ", missing)}.", $" Không tìm thấy file gốc, hãy nạp lại: {string.Join(", ", missing)}.")).Trim();
     }
 
     partial void OnSelectedWorkspaceChanged(Workspace? value) => _ = ReloadSelectedWorkspaceAsync();
@@ -169,7 +170,7 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanWork))]
     private async Task UploadDocumentAsync()
     {
-        var dialog = new OpenFileDialog { Title = "Choose documents", Filter = "Documents (*.pdf;*.txt;*.md)|*.pdf;*.txt;*.md|All files (*.*)|*.*", Multiselect = true };
+        var dialog = new OpenFileDialog { Title = AppText.T("Choose documents", "Chọn tài liệu"), Filter = "Documents (*.pdf;*.txt;*.md)|*.pdf;*.txt;*.md|All files (*.*)|*.*", Multiselect = true };
         if (SelectedWorkspace != null && dialog.ShowDialog() == true) await IngestFilesAsync(dialog.FileNames);
     }
 
@@ -187,13 +188,14 @@ public partial class MainViewModel : ObservableObject
             {
                 if (operation.IsCancellationRequested) break;
                 try { await _rag.IngestDocumentAsync(id, path, progress, operation.Token); success.Add(Path.GetFileName(path)); }
-                catch (OperationCanceledException) { failures.Add(Path.GetFileName(path) + ": canceled or timed out"); break; }
+                catch (OperationCanceledException) { failures.Add(Path.GetFileName(path) + AppText.T(": canceled or timed out", ": đã hủy hoặc hết thời gian chờ")); break; }
                 catch (Exception ex) { failures.Add(Path.GetFileName(path) + ": " + UserErrors.Describe(ex)); }
             }
             var files = await _rag.GetWorkspaceFilesAsync(id);
             if (!Matches(id, conversation, generation)) return;
             UploadedFiles.Clear(); foreach (var file in files) UploadedFiles.Add(file);
-            BusyStatus = $"Completed {success.Count}: {string.Join(", ", success)}. Failed or canceled {failures.Count}: {string.Join("; ", failures)}";
+            BusyStatus = AppText.T($"Completed {success.Count}: {string.Join(", ", success)}. Failed or canceled {failures.Count}: {string.Join("; ", failures)}",
+                $"Hoàn tất {success.Count}: {string.Join(", ", success)}. Lỗi hoặc đã hủy {failures.Count}: {string.Join("; ", failures)}");
         }
         catch (Exception ex) { if (Matches(id, conversation, generation)) BusyStatus = UserErrors.Describe(ex); }
         finally { _operation = null; IsBusy = false; }
@@ -206,7 +208,9 @@ public partial class MainViewModel : ObservableObject
     {
         if (SelectedWorkspace == null || document == null) return;
         var id = SelectedWorkspace.Id; var conversation = SelectedWorkspace.ConversationId; var generation = _selectionGeneration;
-        if (MessageBox.Show($"Remove '{document.DisplayName}' ({document.SourcePath}) and all of its index versions?", "Remove document", MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
+        if (MessageBox.Show(AppText.T($"Remove '{document.DisplayName}' ({document.SourcePath}) and all of its index versions?",
+                $"Xóa '{document.DisplayName}' ({document.SourcePath}) cùng mọi phiên bản index của nó?"),
+            AppText.T("Remove document", "Xóa tài liệu"), MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
         IsBusy = true;
         try
         {
@@ -223,7 +227,7 @@ public partial class MainViewModel : ObservableObject
         if (string.IsNullOrWhiteSpace(UserInput) || SelectedWorkspace == null || !CanWork) return;
         var id = SelectedWorkspace.Id; var conversation = SelectedWorkspace.ConversationId; var generation = _selectionGeneration;
         var question = UserInput.Trim(); var prompt = SystemPrompt; var mode = UseRagMode ? ChatMode.Rag : ChatMode.Direct;
-        UserInput = ""; IsBusy = true; BusyStatus = "Thinking…";
+        UserInput = ""; IsBusy = true; BusyStatus = AppText.T("Thinking…", "Đang suy nghĩ…");
         ChatMessageDisplayModel? pending = null;
         using var operation = new CancellationTokenSource(TimeSpan.FromMinutes(2)); _operation = operation;
         try
@@ -286,7 +290,7 @@ public partial class MainViewModel : ObservableObject
         IsBusy = true;
         try
         {
-            var workspace = new Workspace { Name = "New workspace", SystemPrompt = SystemPrompt };
+            var workspace = new Workspace { Name = AppText.T("New workspace", "Workspace mới"), SystemPrompt = SystemPrompt };
             await _workspaces.AddAsync(workspace); Workspaces.Add(workspace);
             if (generation == _selectionGeneration) SelectedWorkspace = workspace;
         }
@@ -318,8 +322,9 @@ public partial class MainViewModel : ObservableObject
     {
         if (SelectedWorkspace == null) return;
         var workspace = SelectedWorkspace;
-        if (MessageBox.Show($"Delete workspace '{workspace.Name}'? Its documents, index versions, and chat history will be permanently removed.",
-            "Delete workspace", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+        if (MessageBox.Show(AppText.T($"Delete workspace '{workspace.Name}'? Its documents, index versions, and chat history will be permanently removed.",
+                $"Xóa workspace '{workspace.Name}'? Toàn bộ tài liệu, phiên bản index và lịch sử chat sẽ bị xóa vĩnh viễn."),
+            AppText.T("Delete workspace", "Xóa workspace"), MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
         IsBusy = true;
         try
         {
@@ -354,7 +359,7 @@ public partial class MainViewModel : ObservableObject
     }
     [RelayCommand] private void OpenSource(RagSourceDto? source)
     {
-        if (source?.SourcePath == null || !File.Exists(source.SourcePath)) { BusyStatus = "The original source file is no longer available on this device."; return; }
+        if (source?.SourcePath == null || !File.Exists(source.SourcePath)) { BusyStatus = AppText.T("The original source file is no longer available on this device.", "File nguồn gốc không còn trên máy này."); return; }
         try
         {
             var uri = new Uri(Path.GetFullPath(source.SourcePath)).AbsoluteUri;
