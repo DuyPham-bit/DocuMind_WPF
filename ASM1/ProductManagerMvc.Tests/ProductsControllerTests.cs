@@ -53,6 +53,35 @@ public class ProductsControllerTests
     }
 
     [Fact]
+    public async Task Index_WithKeywordOnlyInDescription_TrimsKeywordAndReturnsMatch()
+    {
+        await using var db = CreateInMemoryDb(nameof(Index_WithKeywordOnlyInDescription_TrimsKeywordAndReturnsMatch));
+        var controller = new ProductsController(db);
+
+        // "Switch" chỉ có trong Description của Bàn phím cơ; khoảng trắng thừa phải được Trim().
+        var result = await controller.Index("  Switch  ");
+
+        var viewResult = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsAssignableFrom<List<Product>>(viewResult.Model);
+        var item = Assert.Single(model);
+        Assert.Equal("Bàn phím cơ", item.Name);
+    }
+
+    [Fact]
+    public async Task Index_WithNoMatchingKeyword_ReturnsEmptyListAndKeepsQueryForTheView()
+    {
+        await using var db = CreateInMemoryDb(nameof(Index_WithNoMatchingKeyword_ReturnsEmptyListAndKeepsQueryForTheView));
+        var controller = new ProductsController(db);
+
+        var result = await controller.Index("màn hình");
+
+        var viewResult = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsAssignableFrom<List<Product>>(viewResult.Model);
+        Assert.Empty(model);
+        Assert.Equal("màn hình", viewResult.ViewData["Query"]); // ô tìm kiếm giữ lại từ khóa và hiện nút "Xóa lọc"
+    }
+
+    [Fact]
     public async Task Details_WhenIdMissingOrNotFound_ReturnsNotFound()
     {
         await using var db = CreateInMemoryDb(nameof(Details_WhenIdMissingOrNotFound_ReturnsNotFound));

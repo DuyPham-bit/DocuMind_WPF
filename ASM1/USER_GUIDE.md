@@ -307,7 +307,7 @@ AI Agent không thể đoán đúng ý bạn nếu prompt quá chung chung. Hãy
 ## III. Kịch bản Demo 5 phút & Lỗi thường gặp
 
 ### Kịch bản Demo 5 phút (theo Slide 21)
-1. **Run (30s):** Mở terminal chạy `dotnet test` (cho thấy 15/15 tests pass) rồi `dotnet run`, mở trình duyệt tại `/Products`.
+1. **Run (30s):** Mở terminal chạy `dotnet test` (cho thấy 17/17 tests pass, trong đó 3 test Search: lọc theo tên, lọc theo mô tả có cắt khoảng trắng, không có kết quả) rồi `dotnet run`, mở trình duyệt tại `/Products`.
 2. **CRUD + Search (2 phút):**
    - Thấy sẵn 3 sản phẩm mẫu (`Chuột gaming`, `Bàn phím cơ`, `Tai nghe USB`).
    - Bấm **Thêm sản phẩm** → nhập 1 sản phẩm mới → lưu thành công.
