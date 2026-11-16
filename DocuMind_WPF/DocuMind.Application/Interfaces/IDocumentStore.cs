@@ -16,5 +16,8 @@ public interface IDocumentStore
     Task FailAsync(Guid versionId);
     Task<List<DocumentChunk>> GetCompatibleChunksAsync(Guid workspaceId, EmbeddingSession session, int dimension, CancellationToken ct);
     Task<List<DocumentListItem>> ListAsync(Guid workspaceId, CancellationToken ct = default);
+    // NeedsReindex is true unless a Ready version was built with the given embedding profile.
+    // Without a profile (no embedding provider selected) only the Ready status is checked.
+    Task<List<DocumentListItem>> ListAsync(Guid workspaceId, EmbeddingSession? current, CancellationToken ct = default) => ListAsync(workspaceId, ct);
     Task DeleteAsync(Guid workspaceId, Guid documentId, CancellationToken ct = default);
 }
