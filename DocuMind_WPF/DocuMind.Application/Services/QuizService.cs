@@ -21,17 +21,25 @@ public sealed class QuizService(RagOrchestratorService rag, IChatProviderFactory
     // Giữ nguyên chữ tiếng Việt cho AI đọc; vẫn escape ký tự HTML nhạy cảm như < > &.
     private static readonly JsonSerializerOptions ContextJson = new() { Encoder = JavaScriptEncoder.Create(UnicodeRanges.All) };
 
-    public async Task<QuizDraft> GenerateAsync(Guid workspaceId, string? topic, int questionCount, CancellationToken ct = default)
+    public Task<List<DocumentListItem>> ListDocumentsAsync(Guid workspaceId, CancellationToken ct = default) =>
+        rag.GetWorkspaceFilesAsync(workspaceId, ct);
+
+    public async Task<QuizDraft> GenerateAsync(Guid workspaceId, string? topic, int questionCount, CancellationToken ct = default,
+        IReadOnlyCollection<Guid>? documentIds = null)
     {
+        if (documentIds is { Count: 0 })
+            throw new QuizUnavailableException("Hãy chọn ít nhất một tài liệu để tạo quiz.");
+        // Snapshot the selection: changing UI state must not change an in-flight generation.
+        var selectedIds = documentIds?.ToArray();
         questionCount = Math.Clamp(questionCount, MinQuestions, MaxQuestions);
         topic = topic?.Trim() ?? "";
         var sources = string.IsNullOrEmpty(topic)
-            ? await rag.SampleSourcesAsync(workspaceId, Math.Max(6, questionCount), ct)
-            : await rag.RetrieveSourcesAsync(workspaceId, topic, Math.Max(6, questionCount), ct);
+            ? await rag.SampleSourcesAsync(workspaceId, Math.Max(6, questionCount), ct, selectedIds)
+            : await rag.RetrieveSourcesAsync(workspaceId, topic, Math.Max(6, questionCount), ct, selectedIds);
         if (sources.Count == 0)
             throw new QuizUnavailableException(string.IsNullOrEmpty(topic)
-                ? "Workspace chưa có tài liệu dùng được với cấu hình embedding hiện tại. Hãy nạp hoặc re-index tài liệu."
-                : "Không tìm thấy đoạn tài liệu đủ liên quan tới chủ đề này. Thử chủ đề khác hoặc để trống để ôn toàn bộ.");
+                ? "Phạm vi tài liệu chưa có nội dung dùng được với cấu hình embedding hiện tại. Hãy nạp hoặc re-index tài liệu."
+                : "Không tìm thấy đoạn đủ liên quan trong phạm vi tài liệu đã chọn. Thử chủ đề khác hoặc để trống chủ đề.");
 
         var session = await providers.GetChatSessionAsync(ct);
         var (system, user) = BuildPrompt(topic, questionCount, sources);
@@ -40,7 +48,8 @@ public sealed class QuizService(RagOrchestratorService rag, IChatProviderFactory
         var questions = Parse(raw, sources, questionCount).Select(q => ShuffleOptions(q, Random.Shared)).ToList();
         if (questions.Count == 0)
             throw new QuizUnavailableException("AI chưa trả về câu hỏi đúng định dạng. Hãy bấm tạo lại hoặc giảm số câu.");
-        return new(string.IsNullOrEmpty(topic) ? "Toàn bộ tài liệu" : topic, questions, session);
+        var scopeLabel = selectedIds == null ? "Toàn bộ tài liệu" : "Tài liệu đã chọn";
+        return new(string.IsNullOrEmpty(topic) ? scopeLabel : topic, questions, session);
     }
 
     public static (string System, string User) BuildPrompt(string topic, int questionCount, IReadOnlyList<RagSourceDto> sources)

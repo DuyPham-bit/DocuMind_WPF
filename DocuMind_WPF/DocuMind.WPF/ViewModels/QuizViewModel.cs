@@ -1,10 +1,22 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DocuMind.Application.DTOs;
+using DocuMind.Application.Interfaces;
 using DocuMind.Application.Services;
 
 namespace DocuMind.WPF.ViewModels;
+
+public partial class QuizDocumentItem(DocumentListItem document) : ObservableObject
+{
+    public Guid Id { get; } = document.Id;
+    public string Name { get; } = document.DisplayName;
+    public string SourcePath { get; } = document.SourcePath;
+    public bool IsAvailable { get; } = !document.NeedsReindex;
+    public string StatusLabel => IsAvailable ? "Sẵn sàng" : "Cần nạp lại tài liệu";
+    [ObservableProperty] private bool _isSelected = !document.NeedsReindex;
+}
 
 public partial class QuizOptionItem(int index, string text) : ObservableObject
 {
@@ -58,22 +70,71 @@ public partial class QuizViewModel(QuizService quiz) : ObservableObject
     private Guid _workspaceId;
     private QuizDraft? _draft;
     private CancellationTokenSource? _operation;
+    public ObservableCollection<QuizDocumentItem> Documents { get; } = new();
     public ObservableCollection<QuizQuestionItem> Questions { get; } = new();
     public ObservableCollection<QuizAttemptSummary> History { get; } = new();
     public IReadOnlyList<int> QuestionCounts { get; } = [3, 5, 7, 10];
     [ObservableProperty] private string _workspaceName = "";
     [ObservableProperty] private string _topic = "";
     [ObservableProperty] private int _questionCount = 5;
-    [ObservableProperty] private string _status = "Nhập chủ đề (hoặc để trống để ôn toàn bộ tài liệu) rồi bấm Tạo quiz.";
+    [ObservableProperty] private string _status = "Chọn tài liệu, nhập chủ đề nếu cần rồi bấm Tạo quiz.";
     [ObservableProperty] private string _scoreText = "";
     [ObservableProperty] private bool _isSubmitted;
-    [NotifyCanExecuteChangedFor(nameof(GenerateCommand), nameof(SubmitCommand), nameof(RetryCommand))]
+    [NotifyCanExecuteChangedFor(nameof(GenerateCommand), nameof(SubmitCommand), nameof(RetryCommand), nameof(SelectAllDocumentsCommand), nameof(ClearDocumentSelectionCommand))]
+    [NotifyPropertyChangedFor(nameof(IsSelectionEditable))]
     [ObservableProperty] private bool _isBusy;
+    public bool IsSelectionEditable => !IsBusy;
+    public string DocumentSelectionSummary => Documents.Count == 0
+        ? "Workspace chưa có tài liệu. Hãy nạp tài liệu trước khi tạo quiz."
+        : Documents.All(d => !d.IsAvailable)
+            ? "Chưa có tài liệu sẵn sàng. Hãy nạp lại tài liệu với cấu hình embedding hiện tại."
+            : $"Đã chọn {Documents.Count(d => d.IsAvailable && d.IsSelected)}/{Documents.Count(d => d.IsAvailable)} tài liệu sẵn sàng. Quiz chỉ dùng các file được chọn.";
 
     public async Task InitializeAsync(Guid workspaceId, string workspaceName)
     {
         _workspaceId = workspaceId; WorkspaceName = workspaceName;
-        await ReloadHistoryAsync();
+        IsBusy = true;
+        try
+        {
+            foreach (var document in Documents) document.PropertyChanged -= DocumentSelectionChanged;
+            Documents.Clear();
+            NotifyDocumentSelectionChanged();
+            var documents = await quiz.ListDocumentsAsync(workspaceId);
+            foreach (var document in documents)
+            {
+                var item = new QuizDocumentItem(document);
+                item.PropertyChanged += DocumentSelectionChanged;
+                Documents.Add(item);
+            }
+            NotifyDocumentSelectionChanged();
+            await ReloadHistoryAsync();
+        }
+        catch (Exception ex) { Status = UserErrors.Describe(ex); }
+        finally { IsBusy = false; }
+    }
+
+    private void DocumentSelectionChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        if (args.PropertyName == nameof(QuizDocumentItem.IsSelected)) NotifyDocumentSelectionChanged();
+    }
+
+    private void NotifyDocumentSelectionChanged()
+    {
+        OnPropertyChanged(nameof(DocumentSelectionSummary));
+        GenerateCommand.NotifyCanExecuteChanged();
+    }
+
+    private bool CanEditDocumentSelection() => !IsBusy;
+    [RelayCommand(CanExecute = nameof(CanEditDocumentSelection))]
+    private void SelectAllDocuments()
+    {
+        foreach (var document in Documents) document.IsSelected = document.IsAvailable;
+    }
+
+    [RelayCommand(CanExecute = nameof(CanEditDocumentSelection))]
+    private void ClearDocumentSelection()
+    {
+        foreach (var document in Documents) document.IsSelected = false;
     }
 
     private async Task ReloadHistoryAsync()
@@ -86,20 +147,24 @@ public partial class QuizViewModel(QuizService quiz) : ObservableObject
         catch (Exception ex) { Status = UserErrors.Describe(ex); }
     }
 
-    private bool CanGenerate() => !IsBusy;
+    private bool CanGenerate() => !IsBusy && Documents.Any(d => d.IsAvailable && d.IsSelected);
     [RelayCommand(CanExecute = nameof(CanGenerate))]
     private async Task GenerateAsync()
     {
+        if (!CanGenerate()) return;
+        var selectedIds = Documents.Where(d => d.IsAvailable && d.IsSelected).Select(d => d.Id).ToArray();
+        var topic = Topic;
+        var questionCount = QuestionCount;
         IsBusy = true; IsSubmitted = false; ScoreText = ""; Questions.Clear(); _draft = null;
-        Status = "AI đang đọc tài liệu và soạn câu hỏi...";
-        using var operation = new CancellationTokenSource(TimeSpan.FromMinutes(3)); _operation = operation;
+        Status = $"AI đang soạn {questionCount} câu hỏi từ {selectedIds.Length} tài liệu đã chọn...";
+        using var operation = new CancellationTokenSource(TimeSpan.FromMinutes(10)); _operation = operation;
         try
         {
-            _draft = await quiz.GenerateAsync(_workspaceId, Topic, QuestionCount, operation.Token);
+            _draft = await quiz.GenerateAsync(_workspaceId, topic, questionCount, operation.Token, selectedIds);
             var number = 1;
             foreach (var question in _draft.Questions) Questions.Add(new QuizQuestionItem(number++, question));
             Status = $"Đã tạo {Questions.Count} câu ({_draft.Session.Provider} · {_draft.Session.Model}). Chọn đáp án rồi bấm Nộp bài." +
-                     (Questions.Count < QuestionCount ? $" AI chỉ trả về {Questions.Count}/{QuestionCount} câu hợp lệ." : "");
+                     (Questions.Count < questionCount ? $" AI chỉ trả về {Questions.Count}/{questionCount} câu hợp lệ." : "");
         }
         catch (QuizUnavailableException ex) { Status = ex.Message; }
         catch (Exception ex) { Status = UserErrors.Describe(ex); }

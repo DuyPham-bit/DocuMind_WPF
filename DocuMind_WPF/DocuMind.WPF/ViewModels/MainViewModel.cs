@@ -236,7 +236,7 @@ public partial class MainViewModel : ObservableObject
         var question = UserInput.Trim(); var prompt = SystemPrompt; var mode = UseRagMode ? ChatMode.Rag : ChatMode.Direct;
         UserInput = ""; IsBusy = true; BusyStatus = AppText.T("Thinking…", "Đang suy nghĩ…");
         ChatMessageDisplayModel? pending = null;
-        using var operation = new CancellationTokenSource(TimeSpan.FromMinutes(2)); _operation = operation;
+        using var operation = new CancellationTokenSource(TimeSpan.FromMinutes(10)); _operation = operation;
         try
         {
             var session = await _providers.GetChatSessionAsync(operation.Token);

@@ -15,6 +15,36 @@ namespace DocuMind.Tests;
 public class ProviderRegressionTests
 {
     [Theory]
+    [InlineData("http://localhost:11434/v1", "http://localhost:11434/api/chat")]
+    [InlineData("https://proxy.test/ollama/v1/", "https://proxy.test/ollama/api/chat")]
+    public async Task OllamaRequestsLargerContextAndReadsNativeResponseWithoutChangingEmbeddingEndpoint(string endpoint, string chatUrl)
+    {
+        var handler = new FakeHandler
+        {
+            Response = call => new(HttpStatusCode.OK)
+            {
+                Content = new StringContent(call == 1 ? "{\"message\":{\"content\":\"local answer\"}}" : "{\"data\":[{\"embedding\":[1,0]}]}")
+            }
+        };
+        using var http = new HttpClient(handler);
+        var service = new OpenAiCompatibleService(http, "", endpoint, "qwen3:4b-instruct", AiProviderType.OllamaLocal, "bge-m3");
+        var answer = await service.GenerateResponseAsync("system", "question", .3,
+            history: [new("user", "previous question"), new("assistant", "previous answer")]);
+        Assert.Equal("local answer", answer);
+        Assert.Equal(chatUrl, handler.Requests[0].Url.AbsoluteUri);
+        using var json = JsonDocument.Parse(handler.Requests[0].Body);
+        var payload = json.RootElement;
+        Assert.Equal(8192, payload.GetProperty("options").GetProperty("num_ctx").GetInt32());
+        Assert.Equal(3072, payload.GetProperty("options").GetProperty("num_predict").GetInt32());
+        Assert.Equal(.3, payload.GetProperty("options").GetProperty("temperature").GetDouble());
+        Assert.False(payload.GetProperty("stream").GetBoolean());
+        Assert.Equal(new[] { "system", "user", "assistant", "user" }, payload.GetProperty("messages").EnumerateArray().Select(m => m.GetProperty("role").GetString()));
+        Assert.Equal("previous answer", payload.GetProperty("messages")[2].GetProperty("content").GetString());
+        Assert.Equal(new float[] { 1, 0 }, await service.GenerateEmbeddingAsync("document"));
+        Assert.Equal(endpoint.TrimEnd('/') + "/embeddings", handler.Requests[1].Url.AbsoluteUri);
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task OpenRouterCanBeConfiguredByPastingOnlyAKeyWithoutChangingSavedSettingsUntilSave(bool hasExistingProvider)
@@ -221,6 +251,7 @@ public class ProviderRegressionTests
     {
         using var fixture = new SqliteFixture(); var handler = new FakeHandler(); using var http = new HttpClient(handler);
         if (provider == AiProviderType.Gemini) handler.Response = _ => new(HttpStatusCode.OK) { Content = new StringContent("{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"ok\"}]}}]}") };
+        if (provider == AiProviderType.OllamaLocal) handler.Response = _ => new(HttpStatusCode.OK) { Content = new StringContent("{\"message\":{\"content\":\"ok\"}}") };
         var factory = new ChatProviderFactory(fixture, http, new FakeSecrets());
         await factory.SaveAsync(new(provider, "secret", "configured-model", Temperature: .41));
         var session = await factory.GetChatSessionAsync();
@@ -228,7 +259,12 @@ public class ProviderRegressionTests
         var request = Assert.Single(handler.Requests); Assert.DoesNotContain("secret", request.Url.ToString());
         Assert.Equal("secret", request.Key);
         using var json = JsonDocument.Parse(request.Body);
-        var temperature = provider == AiProviderType.Gemini ? json.RootElement.GetProperty("generationConfig").GetProperty("temperature") : json.RootElement.GetProperty("temperature");
+        var temperature = provider switch
+        {
+            AiProviderType.Gemini => json.RootElement.GetProperty("generationConfig").GetProperty("temperature"),
+            AiProviderType.OllamaLocal => json.RootElement.GetProperty("options").GetProperty("temperature"),
+            _ => json.RootElement.GetProperty("temperature")
+        };
         Assert.Equal(.41, temperature.GetDouble());
     }
 

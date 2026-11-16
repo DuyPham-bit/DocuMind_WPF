@@ -31,7 +31,7 @@ public partial class App : System.Windows.Application
             options.UseSqlite(DatabaseMaintenance.ConnectionString(dbPath)));
 
         // Shared HttpClient.
-        services.AddSingleton<HttpClient>();
+        services.AddSingleton(_ => new HttpClient { Timeout = TimeSpan.FromMinutes(10) });
 
         // 3. Infrastructure Repositories & Parsers
         services.AddScoped(typeof(IRepository<>), typeof(EfRepository<>));
