@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace DocuMind.Application.Services;
+namespace DocuMind.Application.Common;
 
 // An error whose message is written for the user and contains no secrets, so it may be shown as-is.
 public sealed class UserFacingException(string message) : InvalidOperationException(message);

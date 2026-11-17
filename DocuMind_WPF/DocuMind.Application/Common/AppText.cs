@@ -1,4 +1,4 @@
-namespace DocuMind.Application.Services;
+namespace DocuMind.Application.Common;
 
 /// <summary>
 /// Picks the English or Vietnamese form of a message shown to the user.

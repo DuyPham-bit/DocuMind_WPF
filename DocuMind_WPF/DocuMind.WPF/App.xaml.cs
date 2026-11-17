@@ -1,17 +1,11 @@
 using System.IO;
-using System.Net.Http;
 using System.Runtime.Versioning;
 using System.Windows;
-using DocuMind.Application.Interfaces;
-using DocuMind.Application.Services;
-using DocuMind.Domain.Entities;
-using DocuMind.Infrastructure.AiProviders;
-using DocuMind.Infrastructure.DocumentParsers;
-using DocuMind.Infrastructure.Persistence;
-using DocuMind.Infrastructure.Security;
+using DocuMind.Application;
+using DocuMind.Application.Common;
+using DocuMind.Infrastructure;
 using DocuMind.WPF.ViewModels;
 using DocuMind.WPF.Views;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DocuMind.WPF;
@@ -25,34 +19,16 @@ public partial class App : System.Windows.Application
     {
         var services = new ServiceCollection();
 
-        // Local SQLite database.
-        string dbPath = DatabaseMaintenance.DefaultPath;
-        services.AddDbContextFactory<AppDbContext>(options =>
-            options.UseSqlite(DatabaseMaintenance.ConnectionString(dbPath)));
+        // Composition root: each layer registers its own services.
+        services.AddApplication();
+        services.AddInfrastructure();
 
-        // Shared HttpClient.
-        services.AddSingleton(_ => new HttpClient { Timeout = TimeSpan.FromMinutes(10) });
-
-        // 3. Infrastructure Repositories & Parsers
-        services.AddScoped(typeof(IRepository<>), typeof(EfRepository<>));
-        services.AddScoped<IDocumentChunkRepository, EfDocumentChunkRepository>();
-        services.AddScoped<IDocumentParser, PdfPigDocumentParser>();
-        services.AddSingleton<ISecretProtector, WindowsDpapiSecretProtector>();
-        services.AddSingleton<IDocumentStore, EfDocumentStore>();
-        services.AddSingleton<IChatHistoryStore, EfChatHistoryStore>();
-        services.AddSingleton<IQuizStore, EfQuizStore>();
-
-        // 4. AI Provider Factory & Orchestrator
-        services.AddScoped<IChatProviderFactory, ChatProviderFactory>();
-        services.AddScoped<RagOrchestratorService>();
-        services.AddScoped<QuizService>();
-
-        // 5. ViewModels
+        // Presentation: ViewModels
         services.AddTransient<MainViewModel>();
         services.AddTransient<SettingsViewModel>();
         services.AddTransient<QuizViewModel>();
 
-        // 6. Views
+        // Presentation: Views
         services.AddTransient<MainWindow>();
         services.AddTransient<SettingsDialog>();
 
@@ -70,21 +46,16 @@ public partial class App : System.Windows.Application
             _instanceMutex = new Mutex(true, "Local\\DocuMind-" + Environment.UserName, out var ownsInstance);
             if (!ownsInstance) { MessageBox.Show(AppText.T("DocuMind is already running in another window.", "DocuMind đang chạy ở một cửa sổ khác.")); Shutdown(); return; }
             using (var scope = Services.CreateScope())
-            {
-                var factory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>();
-                await using var db = await factory.CreateDbContextAsync();
-                await DatabaseMaintenance.InitializeAsync(db, DatabaseMaintenance.DefaultPath,
+                await scope.ServiceProvider.InitializeDatabaseAsync(
                     Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "documind_local.db"));
-                await DatabaseMaintenance.StartFreshConversationsAsync(db);
-            }
 
             var mainWindow = Services.GetRequiredService<MainWindow>();
             mainWindow.Show();
         }
         catch (Exception ex)
         {
-            MessageBox.Show(AppText.T($"The application could not start: {UserErrors.Describe(ex)}\nDatabase and backups: {Path.GetDirectoryName(DatabaseMaintenance.DefaultPath)}",
-                $"Không khởi động được ứng dụng: {UserErrors.Describe(ex)}\nDatabase và bản sao lưu: {Path.GetDirectoryName(DatabaseMaintenance.DefaultPath)}"),
+            MessageBox.Show(AppText.T($"The application could not start: {UserErrors.Describe(ex)}\nDatabase and backups: {InfrastructureModule.DataDirectory}",
+                $"Không khởi động được ứng dụng: {UserErrors.Describe(ex)}\nDatabase và bản sao lưu: {InfrastructureModule.DataDirectory}"),
                 AppText.T("DocuMind — Startup error", "DocuMind — Lỗi khởi động"), MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown(1);
         }

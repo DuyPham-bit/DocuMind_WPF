@@ -67,7 +67,7 @@ public class WpfSmokeTests
                 main.Dispatcher.Invoke(() => { }, DispatcherPriority.DataBind);
                 main.UpdateLayout();
                 Assert.Contains("Tóm tắt", mainVm.PromptTemplates.Select(t => t.Title));
-                Assert.Contains(Descendants(main).OfType<Button>(), b => Equals(b.Content, "Xuất MD"));
+                Assert.Contains(Descendants(main).OfType<Button>(), b => Equals(b.Content, "Xuất PDF"));
                 DocuMind.WPF.Localization.UiText.Current.ToggleLanguageCommand.Execute(null);
                 Assert.Contains("Summarize", mainVm.PromptTemplates.Select(t => t.Title));
 

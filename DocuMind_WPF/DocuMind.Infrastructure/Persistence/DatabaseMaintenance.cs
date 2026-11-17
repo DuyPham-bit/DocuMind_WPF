@@ -11,6 +11,34 @@ public static class DatabaseMaintenance
     public static string DefaultPath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DocuMind", "documind_local.db");
     public static string ConnectionString(string path) => new SqliteConnectionStringBuilder { DataSource = path, ForeignKeys = true }.ToString();
 
+    // Set to a Supabase/Postgres connection string (key=value or postgresql:// URI) to use Postgres instead of local SQLite.
+    public const string PostgresEnvVar = "DOCUMIND_POSTGRES";
+    public const string PostgresMigrationsAssembly = "DocuMind.Infrastructure.Postgres";
+    public static string? PostgresConnectionFromEnvironment() =>
+        Environment.GetEnvironmentVariable(PostgresEnvVar) is { Length: > 0 } value ? NormalizePostgres(value) : null;
+
+    public static string NormalizePostgres(string value)
+    {
+        value = value.Trim();
+        if (!value.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase) && !value.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase))
+            return value;
+        var uri = new Uri(value);
+        var user = uri.UserInfo.Split(':', 2);
+        var builder = new Npgsql.NpgsqlConnectionStringBuilder
+        {
+            Host = uri.Host,
+            Port = uri.IsDefaultPort || uri.Port < 0 ? 5432 : uri.Port,
+            Database = uri.AbsolutePath.Trim('/') is { Length: > 0 } db ? Uri.UnescapeDataString(db) : "postgres",
+            Username = Uri.UnescapeDataString(user[0]),
+            Password = user.Length > 1 ? Uri.UnescapeDataString(user[1]) : null,
+            SslMode = Npgsql.SslMode.Require
+        };
+        return builder.ConnectionString;
+    }
+
+    public static DbContextOptionsBuilder UsePostgres(this DbContextOptionsBuilder options, string connectionString) =>
+        options.UseNpgsql(connectionString, o => o.MigrationsAssembly(PostgresMigrationsAssembly));
+
     public static void Backup(string source, string destination)
     {
         if (!File.Exists(source)) throw new FileNotFoundException("Không tìm thấy DB nguồn.");
@@ -30,6 +58,13 @@ public static class DatabaseMaintenance
 
     public static async Task<string?> InitializeAsync(AppDbContext db, string path, string? legacyPath = null)
     {
+        if (!db.Database.IsSqlite())
+        {
+            // Hosted Postgres (Supabase) has its own backups; no file copy or legacy adoption applies.
+            await db.Database.MigrateAsync();
+            await RecoverStagingAsync(db);
+            return null;
+        }
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
         if (!File.Exists(path) && legacyPath != null && File.Exists(legacyPath)) Backup(legacyPath, path);
         var assembly = db.GetService<IMigrationsAssembly>();

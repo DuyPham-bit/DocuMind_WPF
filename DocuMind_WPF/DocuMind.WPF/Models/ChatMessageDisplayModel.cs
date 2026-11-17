@@ -1,3 +1,4 @@
+using DocuMind.Application.Common;
 using DocuMind.Application.DTOs;
 using DocuMind.Domain.Enums;
 
@@ -25,7 +26,7 @@ public class ChatMessageDisplayModel
         if (!string.IsNullOrWhiteSpace(message.SourcesJson))
         {
             try { sources = System.Text.Json.JsonSerializer.Deserialize<List<RagSourceDto>>(message.SourcesJson) ?? []; }
-            catch (System.Text.Json.JsonException ex) { DocuMind.Application.Services.UserErrors.Describe(ex); }
+            catch (System.Text.Json.JsonException ex) { DocuMind.Application.Common.UserErrors.Describe(ex); }
         }
         return new() { Id = message.Id, Role = message.Role, Content = message.Content, Timestamp = message.Timestamp.ToLocalTime(),
             Mode = message.Mode, Provider = message.Provider, Model = message.Model, Temperature = message.Temperature, Sources = sources };

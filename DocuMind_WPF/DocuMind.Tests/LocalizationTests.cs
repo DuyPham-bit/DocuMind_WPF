@@ -1,3 +1,4 @@
+using DocuMind.Application.Common;
 using System.Net.Http;
 using DocuMind.Application.Services;
 using DocuMind.Domain.Enums;

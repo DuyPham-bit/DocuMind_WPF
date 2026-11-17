@@ -1,3 +1,4 @@
+using DocuMind.Application.Common;
 using DocuMind.Application.DTOs;
 using DocuMind.Application.Interfaces;
 using DocuMind.Application.Services;

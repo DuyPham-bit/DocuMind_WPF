@@ -1,3 +1,4 @@
+using DocuMind.Application.Common;
 using System.IO;
 using System.Text.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -93,7 +94,7 @@ public sealed partial class UiText : ObservableObject
     public string QuizButtonTooltip => IsVietnamese
         ? "AI tạo câu trắc nghiệm từ tài liệu của workspace, app chấm điểm và lưu lịch sử"
         : "AI writes multiple-choice questions from this workspace's documents; the app grades them and keeps a history";
-    public string ExportButton => IsVietnamese ? "Xuất MD" : "Export";
+    public string ExportButton => IsVietnamese ? "Xuất PDF" : "Export PDF";
     public string NewChatButton => IsVietnamese ? "Chat mới" : "New chat";
     public string EmptyTitle => IsVietnamese ? "Sẵn sàng hỗ trợ bạn" : "Ready when you are";
     public string EmptySubtitle => IsVietnamese
@@ -131,17 +132,23 @@ public sealed partial class UiText : ObservableObject
 
     // Quiz window (modal: language is fixed while it is open, so values are read once when it renders)
     public string QuizWindowTitle => IsVietnamese ? "DocuMind – Quiz ôn tập" : "DocuMind – Study quiz";
-    public string QuizHeading => IsVietnamese ? "📝 Quiz ôn tập từ tài liệu" : "📝 Study quiz from your documents";
+    public string QuizEyebrow => IsVietnamese ? "LUYỆN TẬP TRẮC NGHIỆM" : "STUDY QUIZ";
+    public string QuizHeading => IsVietnamese ? "Quiz ôn tập từ tài liệu" : "Study quiz from your documents";
     public string QuizTopicLabel => IsVietnamese ? "Chủ đề:" : "Topic:";
     public string QuizTopicTooltip => IsVietnamese
         ? "Ví dụ: Dependency Injection, vòng đời DbContext... Để trống để lấy mẫu trong các tài liệu đã chọn"
         : "For example: Dependency Injection, DbContext lifetime... Leave empty to sample the selected documents";
     public string QuizCountLabel => IsVietnamese ? "Số câu:" : "Questions:";
-    public string QuizGenerateButton => IsVietnamese ? "✨ Tạo quiz" : "✨ Generate quiz";
+    public string QuizGenerateButton => IsVietnamese ? "Tạo quiz" : "Generate quiz";
     public string QuizDocumentsHeader => IsVietnamese ? "Tài liệu làm quiz" : "Quiz documents";
     public string QuizSelectAllButton => IsVietnamese ? "Chọn tất cả" : "Select all";
     public string QuizClearSelectionButton => IsVietnamese ? "Bỏ chọn" : "Clear";
     public string QuizHistoryHeader => IsVietnamese ? "LỊCH SỬ ÔN TẬP" : "QUIZ HISTORY";
+    public string QuizNoHistoryText => IsVietnamese ? "Chưa có lượt ôn tập nào." : "No quiz attempts yet.";
+    public string QuizEmptyTitle => IsVietnamese ? "Sẵn sàng ôn tập" : "Ready when you are";
+    public string QuizEmptySubtitle => IsVietnamese
+        ? "Chọn tài liệu phía trên, nhập chủ đề nếu muốn rồi bấm Tạo quiz để AI tạo bộ câu hỏi."
+        : "Select your documents above, add an optional topic, and click Generate quiz to begin.";
     public string QuizRetryButton => IsVietnamese ? "↺ Làm lại" : "↺ Try again";
     public string QuizSubmitButton => IsVietnamese ? "Nộp bài" : "Submit";
 }

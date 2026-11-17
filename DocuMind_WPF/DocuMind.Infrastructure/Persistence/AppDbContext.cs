@@ -21,8 +21,12 @@ public class AppDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        // SQLite keeps its original schema; Postgres (Supabase) gets equivalent provider-specific SQL.
+        var sqlite = Database.IsSqlite();
+        if (!sqlite) modelBuilder.HasCollation("case_insensitive", locale: "und-u-ks-level2", provider: "icu", deterministic: false);
+        var isTrue = sqlite ? "1" : "TRUE";
         modelBuilder.Entity<Document>().HasIndex(d => new { d.WorkspaceId, d.SourcePath }).IsUnique();
-        modelBuilder.Entity<Document>().Property(d => d.SourcePath).UseCollation("NOCASE");
+        modelBuilder.Entity<Document>().Property(d => d.SourcePath).UseCollation(sqlite ? "NOCASE" : "case_insensitive");
         modelBuilder.Entity<Document>().HasOne(d => d.Workspace).WithMany().HasForeignKey(d => d.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<DocumentVersion>().HasOne(v => v.Document).WithMany(d => d.Versions).HasForeignKey(v => v.DocumentId).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<DocumentVersion>().HasOne(v => v.EmbeddingProfile).WithMany().HasForeignKey(v => v.EmbeddingProfileId).OnDelete(DeleteBehavior.Restrict);
@@ -30,8 +34,8 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<DocumentChunk>().HasOne(c => c.DocumentVersion).WithMany(v => v.Chunks).HasForeignKey(c => c.DocumentVersionId).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<DocumentChunk>().HasIndex(c => new { c.DocumentVersionId, c.ChunkIndex }).IsUnique();
         modelBuilder.Entity<EmbeddingProfile>().HasIndex(p => new { p.Provider, p.Model, p.Endpoint, p.Dimension, p.Normalization, p.PipelineVersion }).IsUnique();
-        modelBuilder.Entity<ProviderSetting>().HasIndex(p => p.IsActive).IsUnique().HasFilter("\"IsActive\" = 1");
-        modelBuilder.Entity<ProviderSetting>().HasIndex(p => p.IsEmbeddingActive).IsUnique().HasFilter("\"IsEmbeddingActive\" = 1");
+        modelBuilder.Entity<ProviderSetting>().HasIndex(p => p.IsActive).IsUnique().HasFilter($"\"IsActive\" = {isTrue}");
+        modelBuilder.Entity<ProviderSetting>().HasIndex(p => p.IsEmbeddingActive).IsUnique().HasFilter($"\"IsEmbeddingActive\" = {isTrue}");
         modelBuilder.Entity<ChatMessage>().HasIndex(m => new { m.WorkspaceId, m.ConversationId, m.Timestamp });
         modelBuilder.Entity<QuizAttempt>(entity =>
         {

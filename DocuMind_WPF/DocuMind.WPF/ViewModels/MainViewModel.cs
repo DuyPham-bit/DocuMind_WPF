@@ -1,3 +1,4 @@
+using DocuMind.Application.Common;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
@@ -23,6 +24,7 @@ public partial class MainViewModel : ObservableObject
     private readonly IChatProviderFactory _providers;
     private readonly IRepository<Workspace> _workspaces;
     private readonly IChatHistoryStore _history;
+    private readonly IChatPdfExporter? _pdfExporter;
     private int _selectionGeneration;
     private CancellationTokenSource? _reload, _operation;
     public ObservableCollection<Workspace> Workspaces { get; } = new();
@@ -45,9 +47,9 @@ public partial class MainViewModel : ObservableObject
     public bool CanWork => !IsBusy && !IsLoading;
     public Action? OpenSettingsAction { get; set; }
 
-    public MainViewModel(RagOrchestratorService rag, IChatProviderFactory providers, IRepository<Workspace> workspaces, IChatHistoryStore history)
+    public MainViewModel(RagOrchestratorService rag, IChatProviderFactory providers, IRepository<Workspace> workspaces, IChatHistoryStore history, IChatPdfExporter? pdfExporter = null)
     {
-        _rag = rag; _providers = providers; _workspaces = workspaces; _history = history;
+        _rag = rag; _providers = providers; _workspaces = workspaces; _history = history; _pdfExporter = pdfExporter;
         ChatMessages.CollectionChanged += (_, _) => OnPropertyChanged(nameof(IsChatEmpty));
         // Weak subscription: the static UiText.Current must not keep view models alive.
         System.ComponentModel.PropertyChangedEventManager.AddHandler(UiText.Current, OnLanguageChanged, nameof(UiText.IsVietnamese));
@@ -445,10 +447,39 @@ public partial class MainViewModel : ObservableObject
         }
         return text.ToString();
     }
+    public byte[] BuildPdfExport()
+    {
+        if (_pdfExporter == null)
+            throw new InvalidOperationException(AppText.T("PDF exporter is not configured.", "Chưa cấu hình trình xuất PDF."));
+        var items = ChatMessages.Select(m => new ChatPdfMessage(
+            m.SenderName, m.IsUser, m.Timestamp, m.Mode, m.Provider, m.Model, m.Temperature, m.Content, m.Sources)).ToList();
+        return _pdfExporter.Export(SelectedWorkspace?.Name ?? "Workspace", items);
+    }
+
+    public void ExportToFile(string filePath)
+    {
+        if (Path.GetExtension(filePath).Equals(".md", StringComparison.OrdinalIgnoreCase))
+            File.WriteAllText(filePath, BuildMarkdownExport(), Encoding.UTF8);
+        else
+            File.WriteAllBytes(filePath, BuildPdfExport());
+    }
+
     [RelayCommand] private void ExportMarkdown()
     {
-        var dialog = new SaveFileDialog { Filter = "Markdown (*.md)|*.md", FileName = $"DocuMind_{DateTime.Now:yyyyMMdd_HHmmss}.md" };
-        try { if (dialog.ShowDialog() == true) File.WriteAllText(dialog.FileName, BuildMarkdownExport(), Encoding.UTF8); }
+        var dialog = new SaveFileDialog
+        {
+            Filter = "PDF Document (*.pdf)|*.pdf|Markdown (*.md)|*.md",
+            DefaultExt = ".pdf",
+            FileName = $"DocuMind_{DateTime.Now:yyyyMMdd_HHmmss}.pdf"
+        };
+        try
+        {
+            if (dialog.ShowDialog() == true)
+            {
+                ExportToFile(dialog.FileName);
+                BusyStatus = AppText.T($"Exported: {Path.GetFileName(dialog.FileName)}", $"Đã xuất file: {Path.GetFileName(dialog.FileName)}");
+            }
+        }
         catch (Exception ex) { BusyStatus = UserErrors.Describe(ex); }
     }
     [RelayCommand] private void OpenSource(RagSourceDto? source)

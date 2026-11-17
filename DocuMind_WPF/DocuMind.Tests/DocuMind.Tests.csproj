@@ -25,6 +25,7 @@
     <ProjectReference Include="..\DocuMind.Application\DocuMind.Application.csproj" />
     <ProjectReference Include="..\DocuMind.Infrastructure\DocuMind.Infrastructure.csproj" />
     <ProjectReference Include="..\DocuMind.WPF\DocuMind.WPF.csproj" />
+    <ProjectReference Include="..\DocuMind.Infrastructure.Postgres\DocuMind.Infrastructure.Postgres.csproj" />
   </ItemGroup>
 
 </Project>
